@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>GMU Smoke Monitoring Dashboard</title>
+
+  <!-- CSS -->
+  <link rel="stylesheet" href="style.css">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#6b1f1f">
+</head>
+
+<body>
+
+<!-- 🔐 LOGIN CHECK -->
+<script>
+  if (localStorage.getItem("gmu_auth") !== "true") {
+    window.location.href = "login.html";
+  }
+</script>
+
+<!-- HEADER -->
+<header class="header">
+  <a href="https://gmu.ac.in/" target="_blank" rel="noopener noreferrer">
+    <img src="https://gmu.ac.in/assets/imgs/gmulogo1.png" alt="GMU Logo">
+  </a>
+  <h1>Smoke Monitoring System</h1>
+  <p>GM University · HOD Cabin</p>
+</header>
+
+<!-- DASHBOARD -->
+<main class="dashboard">
+
+  <!-- SMOKE LEVEL CARD -->
+  <div class="card">
+    <h2>Smoke Level</h2>
+
+    <div class="value" id="smokeValue">--</div>
+
+    <div class="meter">
+      <div class="meter-fill" id="smokeMeter"></div>
+    </div>
+
+    <p class="meter-label">
+      Intensity: <span id="meterText">--</span>
+    </p>
+  </div>
+
+  <!-- STATUS CARD -->
+  <div class="card">
+    <h2>Status</h2>
+    <div class="status normal" id="status">LOADING</div>
+    <p id="lastUpdated" style="margin-top:12px;color:#9ca3af;"></p>
+  </div>
+
+  <!-- 🔔 BUZZER CONTROL CARD (MUTE + ENABLE) -->
+  <div class="card actions">
+    <h2>Buzzer Control</h2>
+
+    <button onclick="muteBuzzer()" style="margin-bottom:12px;">
+       Mute Buzzer
+    </button>
+
+    <button onclick="enableBuzzer()" style="background:#22c55e;color:white;">
+      Reset / Enable Buzzer
+    </button>
+  </div>
+
+  <!-- HISTORY TABLE -->
+  <div class="card" style="grid-column:1/-1">
+    <h2>Recent Events</h2>
+
+    <div style="overflow-x:auto">
+      <table id="historyTable" style="width:100%;margin-top:12px;border-collapse:collapse;">
+        <thead>
+          <tr style="background:rgba(255,255,255,0.08)">
+            <th>ID</th>
+            <th>Smoke</th>
+            <th>Status</th>
+            <th>Date</th>
+            <th>Time</th>
+            <th>WiFi</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+</main>
+
+<footer>
+  © GM University · IoT Smoke Detection System
+</footer>
+
+<!-- JS -->
+<script src="app.js"></script>
+
+<script>
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("service-worker.js")
+      .then(() => console.log("Service Worker Registered"))
+      .catch(err => console.error("SW error:", err));
+  }
+</script>
+
+</body>
+</html>
