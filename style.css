@@ -1,0 +1,478 @@
+/* =========================================================
+   GLOBAL GMU CARD GLOW (APPLIES TO ALL CARDS)
+   PASTE THIS AT THE TOP OF CSS
+   ========================================================= */
+
+/* Ensure all cards are glow-capable */
+.card {
+  position: relative;
+  overflow: hidden;
+  transition:
+    transform 0.35s ease,
+    box-shadow 0.35s ease,
+    border-color 0.35s ease;
+}
+
+/* Glass glow layer */
+.card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+
+  background: linear-gradient(
+    120deg,
+    rgba(243, 220, 143, 0.55),
+    rgba(255, 255, 255, 0.08),
+    transparent
+  );
+
+  opacity: 0;
+  transition: opacity 0.35s ease;
+}
+
+/* Hover / focus glow */
+.card:hover,
+.card:focus-within {
+  transform: translateY(-6px) scale(1.01);
+
+  border-color: rgba(243, 220, 143, 0.85);
+
+  box-shadow:
+    0 0 0 1px rgba(243, 220, 143, 0.35),
+    0 0 22px rgba(243, 220, 143, 0.55),
+    0 20px 50px rgba(0,0,0,0.55),
+    inset 0 1px 0 rgba(255,255,255,0.35);
+}
+
+/* Activate glow layer */
+.card:hover::before,
+.card:focus-within::before {
+  opacity: 0.35;
+}
+/* =========================================================
+   FORCE CUSTOM CURSOR EVERYWHERE (NO OVERRIDES)
+   ========================================================= */
+html, body,
+*, *::before, *::after,
+table, tr, td, th,
+p, span, h1, h2, h3, h4, h5, h6,
+.card, .card * {
+  cursor: url("./assets/cursor1.png") 24 24, auto !important;
+  box-sizing: border-box;
+}
+
+/* =========================================================
+   CUSTOM FONT (FIXED)
+   ========================================================= */
+@font-face {
+  font-family: "GMUSans";
+  src: url("./fonts/TACTICSANSEXD-BLDIT.OTF") format("opentype");
+  font-weight: normal;
+  font-style: normal;
+}
+
+/* =========================================================
+   ROOT VARIABLES
+   ========================================================= */
+:root {
+  --font-main: "GMUSans", "Segoe UI", system-ui, sans-serif;
+
+  --bg-main: #5a1919;
+  --bg-glass: rgba(255, 255, 255, 0.14);
+  --bg-glass-hover: rgba(255, 255, 255, 0.18);
+
+  --gold: #f3dc8f;
+
+  --danger: #b91c1c;
+  --success: #15803d;
+
+  --text-main: #ffffff;
+  --text-muted: #f3dc8f;
+}
+
+/* =========================================================
+   GLOBAL RESET
+   ========================================================= */
+* {
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-main);
+  letter-spacing: 0.5px;
+}
+
+/* =========================================================
+   BODY
+   ========================================================= */
+body {
+  background: linear-gradient(
+    160deg,
+    #5a1919 0%,
+    #3f1111 60%,
+    #2b0b0b 100%
+  );
+  color: var(--text-main);
+  min-height: 100vh;
+}
+
+/* =========================================================
+   HEADER
+   ========================================================= */
+.header {
+  padding: 32px 16px;
+  text-align: center;
+}
+
+.header img {
+  width: 90px;
+  height: 90px;
+  border-radius: 50%;
+  background: #ffffff;
+  padding: 6px;
+}
+
+.header h1 {
+  margin-top: 14px;
+  font-size: 1.8rem;
+}
+
+.header p {
+  margin-top: 6px;
+  color: var(--text-muted);
+}
+
+/* =========================================================
+   DASHBOARD GRID
+   ========================================================= */
+.dashboard {
+  max-width: 1100px;
+  margin: auto;
+  padding: 24px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 22px;
+}
+
+/* =========================================================
+   GLASS CARD (FIXED OVERLAY)
+   ========================================================= */
+.card {
+  position: relative;
+  background: var(--bg-glass);
+  backdrop-filter: blur(14px) saturate(180%);
+  -webkit-backdrop-filter: blur(14px) saturate(180%);
+  border-radius: 18px;
+  border: 1px solid rgba(243, 220, 143, 0.35);
+  padding: 26px;
+  transition: transform 0.3s ease, background 0.3s ease;
+}
+
+.card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    120deg,
+    rgba(255,255,255,0.35),
+    rgba(255,255,255,0.05),
+    transparent
+  );
+  opacity: 0.15;
+  pointer-events: none; /* CRITICAL */
+}
+
+.card:hover {
+  transform: translateY(-6px);
+  background: var(--bg-glass-hover);
+}
+
+.card h2 {
+  color: var(--gold);
+  font-weight: 600;
+}
+
+/* =========================================================
+   VALUE
+   ========================================================= */
+.value {
+  font-size: 3rem;
+  font-weight: 700;
+  margin-top: 6px;
+}
+
+/* =========================================================
+   STATUS
+   ========================================================= */
+.status {
+  font-size: 1.4rem;
+  font-weight: 600;
+  padding: 10px 14px;
+  border-radius: 8px;
+  display: inline-block;
+}
+
+.status.normal {
+  background: rgba(21,128,61,0.2);
+  color: var(--success);
+}
+
+.status.alert {
+  background: rgba(185,28,28,0.2);
+  color: var(--danger);
+}
+
+/* =========================================================
+   SMOKE METER
+   ========================================================= */
+.meter {
+  width: 100%;
+  height: 18px;
+  margin-top: 12px;
+  background: rgba(255,255,255,0.15);
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.25);
+}
+
+.meter-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(
+    90deg,
+    #22c55e,
+    #f3dc8f,
+    #5a1919
+  );
+  transition: width 0.6s ease;
+}
+
+.meter-label {
+  margin-top: 8px;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+/* =========================================================
+   ACTION BUTTON
+   ========================================================= */
+.actions button {
+  width: 100%;
+  padding: 14px;
+  background: var(--gold);
+  color: #5a1919;
+  border: none;
+  border-radius: 8px;
+  font-weight: 700;
+  text-transform: uppercase;
+  transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.actions button:hover {
+  background: #e6c96a;
+  transform: scale(1.02);
+}
+
+/* =========================================================
+   FOOTER
+   ========================================================= */
+footer {
+  text-align: center;
+  padding: 22px;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+.header a img {
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.header a:hover img {
+  transform: scale(1.05);
+  box-shadow: 0 0 18px rgba(243, 220, 143, 0.6);
+}
+/* ================= LOGIN PAGE ================= */
+
+.login-container {
+  max-width: 380px;
+  margin: 12vh auto;
+  padding: 32px 28px;
+
+  background: rgba(255,255,255,0.14);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+
+  border-radius: 20px;
+  border: 1px solid rgba(243,220,143,0.35);
+
+  box-shadow:
+    0 25px 60px rgba(0,0,0,0.45),
+    inset 0 1px 0 rgba(255,255,255,0.25);
+
+  text-align: center;
+}
+
+/* GMU LOGO */
+.login-logo {
+  width: 90px;
+  height: 90px;
+  border-radius: 50%;
+  background: #fff;
+  padding: 6px;
+  margin-bottom: 14px;
+}
+
+/* TITLE */
+.login-container h2 {
+  color: #f3dc8f;
+  margin-bottom: 6px;
+}
+
+.login-container p {
+  color: #f3dc8f;
+  font-size: 0.9rem;
+  margin-bottom: 22px;
+}
+
+/* INPUTS */
+.login-container input {
+  width: 100%;
+  padding: 14px;
+  margin-bottom: 16px;
+
+  border-radius: 10px;
+  border: 1px solid rgba(243,220,143,0.45);
+
+  background: rgba(0,0,0,0.35);
+  color: #ffffff;
+  font-size: 1rem;
+}
+
+.login-container input::placeholder {
+  color: rgba(243,220,143,0.7);
+}
+
+/* BUTTON */
+.login-container button {
+  width: 100%;
+  padding: 14px;
+
+  border-radius: 10px;
+  border: none;
+
+  background: #f3dc8f;
+  color: #5a1919;
+
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  cursor: pointer;
+
+  transition: all 0.3s ease;
+}
+
+.login-container button:hover {
+  background: #e6c96a;
+  transform: scale(1.02);
+}
+
+/* ERROR */
+.error-text {
+  margin-top: 12px;
+  color: #ffb4b4;
+  font-size: 0.9rem;
+}
+/* ======================================================
+   MOBILE OPTIMIZATION (≤ 768px)
+   ====================================================== */
+@media (max-width: 768px) {
+
+  /* Reduce header spacing */
+  .header {
+    padding: 22px 14px;
+  }
+
+  .header img {
+    width: 72px;
+    height: 72px;
+  }
+
+  .header h1 {
+    font-size: 1.4rem;
+  }
+
+  .header p {
+    font-size: 0.85rem;
+  }
+
+  /* Dashboard padding */
+  .dashboard {
+    padding: 16px;
+    gap: 16px;
+  }
+
+  /* Cards */
+  .card {
+    padding: 20px;
+    border-radius: 16px;
+  }
+
+  .card h2 {
+    font-size: 0.95rem;
+  }
+
+  /* Smoke value */
+  .value {
+    font-size: 2.2rem;
+  }
+
+  /* Status badge */
+  .status {
+    font-size: 1.1rem;
+    padding: 8px 12px;
+  }
+
+  /* Meter */
+  .meter {
+    height: 14px;
+  }
+
+  .meter-label {
+    font-size: 0.8rem;
+  }
+
+  /* Button */
+  .actions button {
+    padding: 12px;
+    font-size: 0.95rem;
+  }
+
+  /* Table container */
+  table {
+    font-size: 0.85rem;
+  }
+
+  /* Footer */
+  footer {
+    font-size: 0.75rem;
+    padding: 18px;
+  }
+}
+/* ===== TABLE MOBILE FIX ===== */
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th, td {
+  padding: 8px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+@media (max-width: 600px) {
+  table {
+    display: block;
+    overflow-x: auto;
+    font-size: 12px;
+  }
+}
