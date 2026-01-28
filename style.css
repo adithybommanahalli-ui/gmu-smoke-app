@@ -1,70 +1,5 @@
 /* =========================================================
-   GLOBAL GMU CARD GLOW (APPLIES TO ALL CARDS)
-   PASTE THIS AT THE TOP OF CSS
-   ========================================================= */
-
-/* Ensure all cards are glow-capable */
-.card {
-  position: relative;
-  overflow: hidden;
-  transition:
-    transform 0.35s ease,
-    box-shadow 0.35s ease,
-    border-color 0.35s ease;
-}
-
-/* Glass glow layer */
-.card::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  pointer-events: none;
-
-  background: linear-gradient(
-    120deg,
-    rgba(243, 220, 143, 0.55),
-    rgba(255, 255, 255, 0.08),
-    transparent
-  );
-
-  opacity: 0;
-  transition: opacity 0.35s ease;
-}
-
-/* Hover / focus glow */
-.card:hover,
-.card:focus-within {
-  transform: translateY(-6px) scale(1.01);
-
-  border-color: rgba(243, 220, 143, 0.85);
-
-  box-shadow:
-    0 0 0 1px rgba(243, 220, 143, 0.35),
-    0 0 22px rgba(243, 220, 143, 0.55),
-    0 20px 50px rgba(0,0,0,0.55),
-    inset 0 1px 0 rgba(255,255,255,0.35);
-}
-
-/* Activate glow layer */
-.card:hover::before,
-.card:focus-within::before {
-  opacity: 0.35;
-}
-/* =========================================================
-   FORCE CUSTOM CURSOR EVERYWHERE (NO OVERRIDES)
-   ========================================================= */
-html, body,
-*, *::before, *::after,
-table, tr, td, th,
-p, span, h1, h2, h3, h4, h5, h6,
-.card, .card * {
-  cursor: url("./assets/cursor1.png") 24 24, auto !important;
-  box-sizing: border-box;
-}
-
-/* =========================================================
-   CUSTOM FONT (FIXED)
+   CUSTOM FONT
    ========================================================= */
 @font-face {
   font-family: "GMUSans";
@@ -84,6 +19,7 @@ p, span, h1, h2, h3, h4, h5, h6,
   --bg-glass-hover: rgba(255, 255, 255, 0.18);
 
   --gold: #f3dc8f;
+  --maroon: #5a1919;
 
   --danger: #b91c1c;
   --success: #15803d;
@@ -93,13 +29,17 @@ p, span, h1, h2, h3, h4, h5, h6,
 }
 
 /* =========================================================
-   GLOBAL RESET
+   GLOBAL RESET + CURSOR
    ========================================================= */
-* {
+*,
+*::before,
+*::after {
   margin: 0;
   padding: 0;
+  box-sizing: border-box;
   font-family: var(--font-main);
   letter-spacing: 0.5px;
+  cursor: url("./assets/cursor1.png") 24 24, auto !important;
 }
 
 /* =========================================================
@@ -117,29 +57,93 @@ body {
 }
 
 /* =========================================================
+   HEADER ANIMATION
+   ========================================================= */
+@keyframes headerDrop {
+  from {
+    transform: translateY(-40px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* =========================================================
    HEADER
    ========================================================= */
-.header {
-  padding: 32px 16px;
+.top-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+
+  background: var(--gold);
+  border-bottom: 2px solid rgba(90, 25, 25, 0.25);
+
+  animation: headerDrop 3.0s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.header-left,
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.header-title {
+  flex: 1;
   text-align: center;
 }
 
-.header img {
-  width: 90px;
-  height: 90px;
+.header-title h1 {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--maroon);
+}
+
+.header-title p {
+  font-size: 12px;
+  color: var(--maroon);
+  opacity: 0.85;
+}
+
+/* LOGO BASE */
+.header-logo,
+.header-icon {
+  width: 52px;
+  height: 52px;
+  padding: 6px;
   border-radius: 50%;
   background: #ffffff;
-  padding: 6px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  box-shadow: 0 6px 16px rgba(0,0,0,0.18);
+  transition: transform 0.35s cubic-bezier(0.22,1,0.36,1),
+              box-shadow 0.35s cubic-bezier(0.22,1,0.36,1);
 }
 
-.header h1 {
-  margin-top: 14px;
-  font-size: 1.8rem;
+.header-icon {
+  width: 38px;
+  height: 38px;
 }
 
-.header p {
-  margin-top: 6px;
-  color: var(--text-muted);
+.header-logo img,
+.header-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 50%;
+}
+
+.header-logo:hover,
+.header-icon:hover {
+  transform: translateY(-4px) scale(1.08);
+  box-shadow: 0 14px 30px rgba(107,31,31,0.45);
 }
 
 /* =========================================================
@@ -155,17 +159,16 @@ body {
 }
 
 /* =========================================================
-   GLASS CARD (FIXED OVERLAY)
+   CARD + GLOW
    ========================================================= */
 .card {
   position: relative;
   background: var(--bg-glass);
   backdrop-filter: blur(14px) saturate(180%);
-  -webkit-backdrop-filter: blur(14px) saturate(180%);
   border-radius: 18px;
-  border: 1px solid rgba(243, 220, 143, 0.35);
+  border: 1px solid rgba(243,220,143,0.35);
   padding: 26px;
-  transition: transform 0.3s ease, background 0.3s ease;
+  transition: transform 0.35s ease, box-shadow 0.35s ease;
 }
 
 .card::before {
@@ -175,17 +178,24 @@ body {
   border-radius: inherit;
   background: linear-gradient(
     120deg,
-    rgba(255,255,255,0.35),
-    rgba(255,255,255,0.05),
+    rgba(243,220,143,0.55),
+    rgba(255,255,255,0.08),
     transparent
   );
-  opacity: 0.15;
-  pointer-events: none; /* CRITICAL */
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.35s ease;
 }
 
 .card:hover {
-  transform: translateY(-6px);
-  background: var(--bg-glass-hover);
+  transform: translateY(-6px) scale(1.01);
+  box-shadow:
+    0 0 22px rgba(243,220,143,0.55),
+    0 20px 50px rgba(0,0,0,0.55);
+}
+
+.card:hover::before {
+  opacity: 0.35;
 }
 
 .card h2 {
@@ -194,34 +204,14 @@ body {
 }
 
 /* =========================================================
-   VALUE
+   VALUE + STATUS
    ========================================================= */
 .value {
   font-size: 3rem;
   font-weight: 700;
-  margin-top: 6px;
 }
 
-/* =========================================================
-   STATUS
-   ========================================================= */
-.status {
-  font-size: 1.4rem;
-  font-weight: 600;
-  padding: 10px 14px;
-  border-radius: 8px;
-  display: inline-block;
-}
 
-.status.normal {
-  background: rgba(21,128,61,0.2);
-  color: var(--success);
-}
-
-.status.alert {
-  background: rgba(185,28,28,0.2);
-  color: var(--danger);
-}
 
 /* =========================================================
    SMOKE METER
@@ -233,18 +223,11 @@ body {
   background: rgba(255,255,255,0.15);
   border-radius: 12px;
   overflow: hidden;
-  border: 1px solid rgba(255,255,255,0.25);
 }
 
 .meter-fill {
   height: 100%;
   width: 0%;
-  background: linear-gradient(
-    90deg,
-    #22c55e,
-    #f3dc8f,
-    #5a1919
-  );
   transition: width 0.6s ease;
 }
 
@@ -255,17 +238,16 @@ body {
 }
 
 /* =========================================================
-   ACTION BUTTON
+   BUTTONS
    ========================================================= */
 .actions button {
   width: 100%;
   padding: 14px;
-  background: var(--gold);
-  color: #5a1919;
-  border: none;
   border-radius: 8px;
+  border: none;
   font-weight: 700;
-  text-transform: uppercase;
+  background: var(--gold);
+  color: var(--maroon);
   transition: transform 0.2s ease, background 0.2s ease;
 }
 
@@ -275,189 +257,8 @@ body {
 }
 
 /* =========================================================
-   FOOTER
+   TABLE
    ========================================================= */
-footer {
-  text-align: center;
-  padding: 22px;
-  color: var(--text-muted);
-  font-size: 0.85rem;
-}
-.header a img {
-  transition: transform 0.25s ease, box-shadow 0.25s ease;
-}
-
-.header a:hover img {
-  transform: scale(1.05);
-  box-shadow: 0 0 18px rgba(243, 220, 143, 0.6);
-}
-/* ================= LOGIN PAGE ================= */
-
-.login-container {
-  max-width: 380px;
-  margin: 12vh auto;
-  padding: 32px 28px;
-
-  background: rgba(255,255,255,0.14);
-  backdrop-filter: blur(16px) saturate(180%);
-  -webkit-backdrop-filter: blur(16px) saturate(180%);
-
-  border-radius: 20px;
-  border: 1px solid rgba(243,220,143,0.35);
-
-  box-shadow:
-    0 25px 60px rgba(0,0,0,0.45),
-    inset 0 1px 0 rgba(255,255,255,0.25);
-
-  text-align: center;
-}
-
-/* GMU LOGO */
-.login-logo {
-  width: 90px;
-  height: 90px;
-  border-radius: 50%;
-  background: #fff;
-  padding: 6px;
-  margin-bottom: 14px;
-}
-
-/* TITLE */
-.login-container h2 {
-  color: #f3dc8f;
-  margin-bottom: 6px;
-}
-
-.login-container p {
-  color: #f3dc8f;
-  font-size: 0.9rem;
-  margin-bottom: 22px;
-}
-
-/* INPUTS */
-.login-container input {
-  width: 100%;
-  padding: 14px;
-  margin-bottom: 16px;
-
-  border-radius: 10px;
-  border: 1px solid rgba(243,220,143,0.45);
-
-  background: rgba(0,0,0,0.35);
-  color: #ffffff;
-  font-size: 1rem;
-}
-
-.login-container input::placeholder {
-  color: rgba(243,220,143,0.7);
-}
-
-/* BUTTON */
-.login-container button {
-  width: 100%;
-  padding: 14px;
-
-  border-radius: 10px;
-  border: none;
-
-  background: #f3dc8f;
-  color: #5a1919;
-
-  font-weight: 700;
-  letter-spacing: 0.6px;
-  cursor: pointer;
-
-  transition: all 0.3s ease;
-}
-
-.login-container button:hover {
-  background: #e6c96a;
-  transform: scale(1.02);
-}
-
-/* ERROR */
-.error-text {
-  margin-top: 12px;
-  color: #ffb4b4;
-  font-size: 0.9rem;
-}
-/* ======================================================
-   MOBILE OPTIMIZATION (≤ 768px)
-   ====================================================== */
-@media (max-width: 768px) {
-
-  /* Reduce header spacing */
-  .header {
-    padding: 22px 14px;
-  }
-
-  .header img {
-    width: 72px;
-    height: 72px;
-  }
-
-  .header h1 {
-    font-size: 1.4rem;
-  }
-
-  .header p {
-    font-size: 0.85rem;
-  }
-
-  /* Dashboard padding */
-  .dashboard {
-    padding: 16px;
-    gap: 16px;
-  }
-
-  /* Cards */
-  .card {
-    padding: 20px;
-    border-radius: 16px;
-  }
-
-  .card h2 {
-    font-size: 0.95rem;
-  }
-
-  /* Smoke value */
-  .value {
-    font-size: 2.2rem;
-  }
-
-  /* Status badge */
-  .status {
-    font-size: 1.1rem;
-    padding: 8px 12px;
-  }
-
-  /* Meter */
-  .meter {
-    height: 14px;
-  }
-
-  .meter-label {
-    font-size: 0.8rem;
-  }
-
-  /* Button */
-  .actions button {
-    padding: 12px;
-    font-size: 0.95rem;
-  }
-
-  /* Table container */
-  table {
-    font-size: 0.85rem;
-  }
-
-  /* Footer */
-  footer {
-    font-size: 0.75rem;
-    padding: 18px;
-  }
-}
-/* ===== TABLE MOBILE FIX ===== */
 table {
   width: 100%;
   border-collapse: collapse;
@@ -465,14 +266,329 @@ table {
 
 th, td {
   padding: 8px;
-  text-align: left;
   white-space: nowrap;
 }
 
+/* =========================================================
+   FOOTER
+   ========================================================= */
+.footer {
+  background: var(--gold);
+  color: var(--maroon);
+  margin-top: 60px;
+}
+
+.footer-container {
+  max-width: 1200px;
+  margin: auto;
+  padding: 40px 20px;
+  display: grid;
+  grid-template-columns: 1.2fr 1.6fr 1.2fr;
+  gap: 40px;
+}
+
+.footer-section h3 {
+  font-size: 18px;
+  margin-bottom: 12px;
+}
+
+.footer-section p {
+  font-size: 13px;
+  line-height: 1.6;
+  text-align: justify;
+}
+
+.person-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.person-row {
+  display: flex;
+  justify-content: space-between;
+  background: rgba(255,255,255,0.7);
+  padding: 12px 14px;
+  border-radius: 14px;
+  font-weight: 600;
+}
+
+.footer-bottom {
+  text-align: center;
+  padding: 14px;
+  border-top: 1px solid rgba(90,25,25,0.25);
+  font-size: 13px;
+}
+
+/* =========================================================
+   MOBILE
+   ========================================================= */
+@media (max-width: 900px) {
+  .footer-container {
+    grid-template-columns: 1fr;
+  }
+
+  .person-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
 @media (max-width: 600px) {
+  .top-header {
+    padding: 10px 14px;
+  }
+
+  .header-title h1 {
+    font-size: 16px;
+  }
+
+  .dashboard {
+    padding: 16px;
+  }
+
   table {
     display: block;
     overflow-x: auto;
     font-size: 12px;
   }
+}
+/* ================= FOOTER LINK COLOR FIX ================= */
+
+.footer a,
+.footer a:visited,
+.footer a:active {
+  color: #5a1919 !important;   /* GMU maroon */
+  text-decoration: none;
+}
+
+.footer a:hover {
+  color: #6b1f1f;              /* darker maroon */
+  text-decoration: underline;
+}
+/* ================= FOOTER HOVER EFFECT ================= */
+
+/* Hover effect for person boxes (HOD, Coordinator, Members) */
+.footer .person-row {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.footer .person-row:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 22px rgba(90, 25, 25, 0.28);
+}
+
+/* Subtle glow for footer sections */
+.footer-section {
+  transition: transform 0.3s ease;
+}
+
+.footer-section:hover {
+  transform: translateY(-2px);
+}
+/* ================= DASHBOARD HERO LAYOUT ================= */
+.dashboard-hero {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 26px;
+  align-items: stretch;
+}
+
+/* ================= CENTER LOGO CARD ================= */
+.center-visual {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ================= LOGO WRAPPER ================= */
+.logo-wrapper {
+  width: 220px;
+  height: 220px;
+
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(243,220,143,0.95),
+    rgba(243,220,143,0.75),
+    rgba(90,25,25,0.2)
+  );
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  box-shadow:
+    0 0 0 6px rgba(243,220,143,0.25),
+    0 30px 80px rgba(0,0,0,0.45);
+
+  transition: transform 0.4s cubic-bezier(0.22,1,0.36,1),
+              box-shadow 0.4s cubic-bezier(0.22,1,0.36,1);
+}
+
+/* ================= SVG LOGO ================= */
+.gmu-logo {
+  width: 140px;
+  height: 140px;
+  filter: drop-shadow(0 10px 25px rgba(0,0,0,0.35));
+  transition: transform 0.4s cubic-bezier(0.22,1,0.36,1);
+}
+
+/* ================= PROXIMITY / HOVER EFFECT ================= */
+.logo-wrapper:hover {
+  transform: translateY(-8px) scale(1.08);
+  box-shadow:
+    0 0 0 10px rgba(243,220,143,0.45),
+    0 40px 90px rgba(0,0,0,0.55);
+}
+
+.logo-wrapper:hover .gmu-logo {
+  transform: rotate(-2deg) scale(1.05);
+}
+
+/* ================= SUBTLE FLOAT ANIMATION ================= */
+@keyframes floatLogo {
+  0%   { transform: translateY(0); }
+  50%  { transform: translateY(-6px); }
+  100% { transform: translateY(0); }
+}
+
+.logo-wrapper {
+  animation: floatLogo 6s ease-in-out infinite;
+}
+
+/* ================= MOBILE FIX ================= */
+@media (max-width: 900px) {
+  .dashboard-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .logo-wrapper {
+    width: 180px;
+    height: 180px;
+  }
+
+  .gmu-logo {
+    width: 120px;
+    height: 120px;
+  }
+}
+/* ================= TOP GRID LAYOUT ================= */
+.dashboard-top {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 30px;
+  align-items: center;
+}
+
+/* ================= CENTER SVG ONLY ================= */
+.center-svg {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none; /* allow proximity illusion */
+}
+
+#interactiveLogo {
+  width: 160px;
+  height: auto;
+
+  filter: drop-shadow(0 10px 30px rgba(0,0,0,0.45));
+  transition:
+    transform 0.15s linear,
+    filter 0.15s linear;
+}
+
+/* ================= MOBILE FIX ================= */
+@media (max-width: 900px) {
+  .dashboard-top {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+
+  #interactiveLogo {
+    width: 120px;
+  }
+}
+/* ================= CARD PROXIMITY / HOVER EFFECT ================= */
+.card {
+  transition:
+    transform 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.card:hover {
+  transform: translateY(-10px) scale(1.05);
+
+  box-shadow:
+    0 0 0 1px rgba(243, 220, 143, 0.35),
+    0 12px 28px rgba(0, 0, 0, 0.35),
+    0 0 24px rgba(243, 220, 143, 0.45);
+}
+/* ================= SVG CENTER ================= */
+.svg-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Base SVG look */
+#gmuSvg {
+  transition: transform 0.3s ease;
+}
+
+/* SVG elements */
+#gmuSvg .svg-core {
+  fill: #5a1919;
+  transition: transform 0.25s ease, fill 0.25s ease;
+}
+
+#gmuSvg .svg-ring {
+  fill: none;
+  stroke: #f3dc8f;
+  stroke-width: 6;
+  transition: transform 0.25s ease, stroke-width 0.25s ease;
+}
+/* ================= SMOKE METER STYLES ================= */
+#smokeMeterContainer {
+  width: 100%;
+  height: 30px;
+  background-color: #e0e0e0;
+  border-radius: 15px;
+  margin: 20px 0;
+  overflow: hidden;
+  position: relative;
+  box-shadow: inset 0 2px 5px rgba(0,0,0,0.2);
+}
+
+#smokeMeter {
+  height: 100%;
+  width: 0%;
+  transition: width 0.5s ease, background-color 0.5s ease;
+  border-radius: 15px;
+}
+
+#meterText {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-weight: bold;
+  color: #333;
+  font-size: 14px;
+  z-index: 2;
+  text-shadow: 1px 1px 2px white;
+}
+
+/* Color indicators */
+.meter-low {
+  background: linear-gradient(90deg, #22c55e, #4ade80) !important;
+}
+
+.meter-medium {
+  background: linear-gradient(90deg, #f59e0b, #fbbf24) !important;
+}
+
+.meter-high {
+  background: linear-gradient(90deg, #dc2626, #ef4444) !important;
 }
