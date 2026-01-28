@@ -21,21 +21,35 @@
 </script>
 
 <!-- HEADER -->
-<header class="header">
-  <a href="https://gmu.ac.in/" target="_blank" rel="noopener noreferrer">
-    <img src="https://gmu.ac.in/assets/imgs/gmulogo1.png" alt="GMU Logo">
-  </a>
-  <h1>Smoke Monitoring System</h1>
-  <p>GM University · HOD Cabin</p>
+<header class="top-header">
+  <div class="header-left">
+    <a href="https://gmu.ac.in/" target="_blank">
+      <img src="https://gmu.ac.in/assets/imgs/gmulogo1.png" alt="GMU Logo" class="header-logo">
+    </a>
+  </div>
+
+  <div class="header-title">
+    <h1>Smoke Monitoring System</h1>
+    <p>GM University · HOD Cabin</p>
+  </div>
+
+  <div class="header-right">
+    <a href="https://github.com/adithybommanahalli-ui/gmu-smoke-app" target="_blank">
+      <img src="https://cdn-icons-png.flaticon.com/512/25/25231.png" alt="GitHub" class="header-icon">
+    </a>
+
+    <a href="https://cse-gmu-falcon.vercel.app/" target="_blank">
+      <img src="assets/Comp 2_00000.png" alt="CSE GMU" class="header-icon">
+    </a>
+  </div>
 </header>
 
 <!-- DASHBOARD -->
-<main class="dashboard">
+<main class="dashboard dashboard-top">
 
-  <!-- SMOKE LEVEL CARD -->
+  <!-- LEFT : SMOKE LEVEL -->
   <div class="card">
     <h2>Smoke Level</h2>
-
     <div class="value" id="smokeValue">--</div>
 
     <div class="meter">
@@ -47,25 +61,25 @@
     </p>
   </div>
 
-  <!-- STATUS CARD -->
-  <div class="card">
-    <h2>Status</h2>
-    <div class="status normal" id="status">LOADING</div>
-    <p id="lastUpdated" style="margin-top:12px;color:#9ca3af;"></p>
+  <!-- CENTER : PURE SVG (NO CARD) -->
+  <div class="center-svg">
+    <img src="assets/gmu-logo.svg" alt="GMU Logo" id="interactiveLogo">
   </div>
 
-  <!-- 🔔 BUZZER CONTROL CARD (MUTE + ENABLE) -->
+  <!-- RIGHT : BUZZER CONTROL -->
   <div class="card actions">
     <h2>Buzzer Control</h2>
 
     <button onclick="muteBuzzer()" style="margin-bottom:12px;">
-       Mute Buzzer
+      Mute Buzzer
     </button>
 
     <button onclick="enableBuzzer()" style="background:#22c55e;color:white;">
       Reset / Enable Buzzer
     </button>
   </div>
+
+
 
   <!-- HISTORY TABLE -->
   <div class="card" style="grid-column:1/-1">
@@ -90,8 +104,88 @@
 
 </main>
 
-<footer>
-  © GM University · IoT Smoke Detection System
+<footer class="footer">
+  <div class="footer-container">
+
+    <!-- PROJECT INFO -->
+    <div class="footer-section">
+      <h3>Smoke Monitoring System</h3>
+      <p>
+        Project Based Learning (PBL) on Internet of Things (IoT),
+        developed under the Department of Computer Science &
+        Engineering, GM University.
+      </p>
+    </div>
+
+   <div class="footer-section">
+
+  <p><b>Project Team </b></p>
+
+  <!-- HOD -->
+  <div class="person-list">
+    <div class="person-row">
+      <span class="person-left">HOD CSE</span>
+      <span class="person-right">Dr. Shivanagowda G M</span>
+    </div>
+
+    <div class="person-row">
+      <span class="person-left">Project Coordinator</span>
+      <span class="person-right">Ms. Nanditha G</span>
+      
+    </div>
+  </div>
+<div style="margin-bottom: 20px;"></div>
+
+  <!-- TEAM MEMBERS TITLE -->
+  <p class="sub-heading"><b>Team Members</b></p>
+
+  <!-- STUDENTS -->
+  <div class="person-list">
+    <div class="person-row">
+      <span class="person-left">Abhishek U S</span>
+      <span class="person-right">UE24E01CS004</span>
+    </div>
+
+    <div class="person-row">
+      <span class="person-left">Aditya B</span>
+      <span class="person-right">UE24E01CS006</span>
+    </div>
+
+    <div class="person-row">
+      <span class="person-left">Aman M K</span>
+      <span class="person-right">UE24E01CS010</span>
+    </div>
+
+    <div class="person-row">
+      <span class="person-left">Chandankumar K</span>
+      <span class="person-right">UE24E01CS034</span>
+    </div>
+  </div>
+
+</div>
+</div>
+    <!-- CONTACT -->
+    <div class="footer-section contact-section">
+      <h3>Contact</h3>
+      <p>
+        Email:
+       <a href="https://mail.google.com/mail/?view=cm&fs=1&to=iotsmokedetector@gmail.com" target="_blank"> iotsmokedetector@gmail.com </a>
+        </a>
+      </p>
+      <p>Phone: +91 91484 82960</p>
+      <p>
+        Website:
+        <a href="https://gmu.ac.in" target="_blank">
+          www.gmu.ac.in
+        </a>
+      </p>
+    </div>
+
+  </div>
+
+  <div class="footer-bottom">
+    © GM University · IoT Smoke Detection System
+  </div>
 </footer>
 
 <!-- JS -->
