@@ -5,7 +5,7 @@ if ("Notification" in window && Notification.permission === "default") {
 
 /* ================= CONFIG ================= */
 const SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbxCzMGTu_8ewgYNSkm4ehepziUHuraEVPPLtdAdNrPlTWZs05qR6edYyQ4AD0BfU_4hpA/exec";
+  "https://script.google.com/macros/s/AKfycby-0HM28gYYkhWHXIXIc9HIdtde_uofL73eAeXhr832gjdokaXQ1X_w4SnRUOulNEF_sQ/exec";
 
 const MAX_SMOKE = 700;
 
@@ -150,3 +150,4 @@ setInterval(fetchHistory, 5000);
 fetchLatest();
 
 fetchHistory();
+
