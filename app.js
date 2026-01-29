@@ -65,7 +65,6 @@ function cleanDate(val) {
 /* ================= FETCH LATEST ================= */
 async function fetchLatest() {
   try {
-    // Add cache-busting to avoid cached responses
     const timestamp = new Date().getTime();
     const res = await fetch(`${SCRIPT_URL}?action=latest&_=${timestamp}`);
     const data = await res.json();
@@ -80,27 +79,32 @@ async function fetchLatest() {
     }
     lastNotifyStatus = status;
 
-    /* VALUE */
-    smokeValueEl.textContent = smoke;
+    /* VALUE - Updates the big number */
+    if (smokeValueEl) smokeValueEl.textContent = smoke;
 
-    /* TIME CLEANUP */
-    const displayDate = cleanDate(data.date);
-    const displayTime = cleanTimestamp(data.time);
-    lastUpdatedEl.textContent = `Last updated: ${displayDate} ${displayTime}`;
+    /* TIME CLEANUP - Safe check added here! */
+    if (lastUpdatedEl) {
+        const displayDate = cleanDate(data.date);
+        const displayTime = cleanTimestamp(data.time);
+        lastUpdatedEl.textContent = `Last updated: ${displayDate} ${displayTime}`;
+    }
 
-    /* METER */
+    /* METER - This will now run correctly */
     const percent = Math.min((smoke / MAX_SMOKE) * 100, 100);
-    smokeMeter.style.width = percent + "%";
+    
+    if (smokeMeter) {
+        smokeMeter.style.width = percent + "%";
 
-    if (smoke < 250) {
-      smokeMeter.style.background = "#22c55e";
-      meterText.textContent = "LOW";
-    } else if (smoke < 400) {
-      smokeMeter.style.background = "#f3dc8f";
-      meterText.textContent = "MEDIUM";
-    } else {
-      smokeMeter.style.background = "#5a1919";
-      meterText.textContent = "HIGH";
+        if (smoke < 50) {
+          smokeMeter.style.background = "#22c55e"; // Green
+          if(meterText) meterText.textContent = "LOW";
+        } else if (smoke < 120) {
+          smokeMeter.style.background = "#f3dc8f"; // Yellow
+          if(meterText) meterText.textContent = "MEDIUM";
+        } else {
+          smokeMeter.style.background = "#5a1919"; // Red
+          if(meterText) meterText.textContent = "HIGH";
+        }
     }
 
   } catch (err) {
@@ -238,3 +242,4 @@ if (svg) {
     ring.style.transform = "scale(1)";
   });
 }
+
