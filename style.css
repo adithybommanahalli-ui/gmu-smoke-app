@@ -816,3 +816,27 @@ body {
     }
 }
 }
+/* --- METER CSS --- */
+.meter {
+  width: 100%;
+  height: 20px; /* Essential: Gives the bar height */
+  background-color: rgba(255, 255, 255, 0.1); /* Dark background for empty part */
+  border-radius: 10px;
+  overflow: hidden; /* Ensures the inner bar respects rounded corners */
+  margin: 15px 0;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.meter-fill {
+  height: 100%; /* Fills the container's height */
+  width: 0%; /* JS will update this */
+  background-color: #22c55e; /* Default color */
+  transition: width 0.5s ease-in-out, background-color 0.5s ease; /* Smooth animation */
+  border-radius: 10px;
+}
+
+.meter-label {
+    margin-top: 5px;
+    font-size: 0.9rem;
+    color: #ccc;
+}
