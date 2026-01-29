@@ -592,3 +592,188 @@ th, td {
 .meter-high {
   background: linear-gradient(90deg, #dc2626, #ef4444) !important;
 }
+/* ================= LOGIN PAGE STYLES (FINAL & WORKING) ================= */
+
+/* Page background */
+body {
+  background: linear-gradient(
+    160deg,
+    #5a1919 0%,
+    #3f1111 60%,
+    #2b0b0b 100%
+  );
+}
+
+/* Login card */
+.login-container {
+  max-width: 380px;
+  width: 90%;
+  margin: 12vh auto;
+  padding: 32px 28px;
+
+  background: rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+
+  border-radius: 22px;
+  border: 1px solid rgba(243, 220, 143, 0.4);
+
+  box-shadow:
+    0 25px 60px rgba(0,0,0,0.5),
+    inset 0 1px 0 rgba(255,255,255,0.25);
+
+  text-align: center;
+}
+
+/* GMU Logo */
+.login-logo {
+  width: 90px;
+  height: 90px;
+  border-radius: 50%;
+  background: #ffffff;
+  padding: 6px;
+  margin-bottom: 16px;
+}
+
+/* Title */
+.login-container h2 {
+  color: #f3dc8f;
+  margin-bottom: 6px;
+  font-size: 1.4rem;
+}
+
+/* Subtitle */
+.login-container p {
+  color: #f3dc8f;
+  font-size: 0.9rem;
+  margin-bottom: 22px;
+  opacity: 0.9;
+}
+
+/* Inputs */
+.login-container input {
+  width: 100%;
+  padding: 14px;
+  margin-bottom: 16px;
+
+  border-radius: 10px;
+  border: 1px solid rgba(243, 220, 143, 0.45);
+
+  background: rgba(0, 0, 0, 0.35);
+  color: #ffffff;
+  font-size: 1rem;
+}
+
+.login-container input::placeholder {
+  color: rgba(243, 220, 143, 0.7);
+}
+
+/* Login button */
+.login-container button {
+  width: 100%;
+  padding: 14px;
+
+  border-radius: 10px;
+  border: none;
+
+  background: #f3dc8f;
+  color: #5a1919;
+
+  font-weight: 700;
+  letter-spacing: 0.6px;
+
+  transition: transform 0.25s ease, background 0.25s ease;
+}
+
+.login-container button:hover {
+  background: #e6c96a;
+  transform: scale(1.02);
+}
+
+/* Error text */
+.error-text {
+  margin-top: 12px;
+  color: #ffb4b4;
+  font-size: 0.9rem;
+}
+
+/* --- MOBILE RESPONSIVENESS FIX --- */
+
+@media screen and (max-width: 768px) {
+  /* 1. Reset the Dashboard Layout */
+  .dashboard {
+    display: flex;
+    flex-direction: column;
+    padding: 10px;
+    gap: 15px;
+  }
+
+  /* 2. Force Cards to take full width */
+  .card {
+    width: 100% !important;
+    margin: 0 auto;
+    box-sizing: border-box;
+    padding: 15px;
+  }
+
+  /* 3. Handle the Center Logo */
+  .center-svg {
+    order: -1; /* Moves logo to the top, or remove if you want it between cards */
+    text-align: center;
+    margin: 10px 0;
+  }
+
+  .center-svg img {
+    max-width: 120px; /* Scales logo down for mobile */
+    height: auto;
+  }
+
+  /* 4. Adjust Typography for smaller screens */
+  .header-title h1 {
+    font-size: 1.2rem;
+  }
+  
+  .header-title p {
+    font-size: 0.8rem;
+  }
+
+  .value {
+    font-size: 3rem !important; /* Makes the '57' smoke level fit better */
+  }
+
+  /* 5. Fix the Table (Enables horizontal scroll for the table card) */
+  div[style*="overflow-x:auto"] {
+    width: 100%;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  #historyTable th, #historyTable td {
+    font-size: 12px; /* Smaller text for the logs */
+    padding: 8px 4px;
+  }
+
+  /* 6. Footer Adjustments */
+  .footer-container {
+    flex-direction: column;
+    text-align: center;
+    gap: 30px;
+  }
+
+  .person-row {
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    margin-bottom: 10px;
+  }
+
+  .person-left, .person-right {
+    text-align: center !important;
+  }
+}
+
+/* Fix for very small screens (phones in portrait) */
+@media screen and (max-width: 480px) {
+  .header-right {
+    display: none; /* Hides GitHub/Link icons if they overlap the title */
+  }
+}
