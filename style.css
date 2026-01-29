@@ -697,10 +697,43 @@ body {
   font-size: 0.9rem;
 }
 
-/* --- MOBILE RESPONSIVENESS FIX --- */
+/* --- UPDATED MOBILE RESPONSIVENESS FIX --- */
 
 @media screen and (max-width: 768px) {
-  /* 1. Reset the Dashboard Layout */
+  /* 1. Fix the Header Layout so icons don't vanish */
+  .top-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    flex-wrap: nowrap; /* Keeps everything on one line */
+  }
+
+  .header-logo {
+    height: 40px; /* Smaller main logo */
+  }
+
+  .header-title h1 {
+    font-size: 1rem;
+    line-height: 1.2;
+  }
+  
+  .header-title p {
+    font-size: 0.7rem;
+  }
+
+  /* 2. Resize the GitHub and CSE icons instead of hiding them */
+  .header-right {
+    display: flex !important; 
+    gap: 8px;
+  }
+
+  .header-icon {
+    height: 24px; /* Smaller icons for mobile */
+    width: auto;
+  }
+
+  /* 3. Reset the Dashboard Layout to stack vertically */
   .dashboard {
     display: flex;
     flex-direction: column;
@@ -708,7 +741,7 @@ body {
     gap: 15px;
   }
 
-  /* 2. Force Cards to take full width */
+  /* 4. Force Cards to take full width */
   .card {
     width: 100% !important;
     margin: 0 auto;
@@ -716,64 +749,70 @@ body {
     padding: 15px;
   }
 
-  /* 3. Handle the Center Logo */
+  /* 5. Center Logo Adjustments */
   .center-svg {
-    order: -1; /* Moves logo to the top, or remove if you want it between cards */
     text-align: center;
     margin: 10px 0;
   }
 
   .center-svg img {
-    max-width: 120px; /* Scales logo down for mobile */
+    max-width: 100px;
     height: auto;
   }
 
-  /* 4. Adjust Typography for smaller screens */
-  .header-title h1 {
-    font-size: 1.2rem;
-  }
-  
-  .header-title p {
-    font-size: 0.8rem;
-  }
-
+  /* 6. Typography adjustments for the Smoke Value */
   .value {
-    font-size: 3rem !important; /* Makes the '57' smoke level fit better */
+    font-size: 2.5rem !important;
   }
 
-  /* 5. Fix the Table (Enables horizontal scroll for the table card) */
+  /* 7. Table and Footer Fixes */
   div[style*="overflow-x:auto"] {
     width: 100%;
-    -webkit-overflow-scrolling: touch;
   }
 
   #historyTable th, #historyTable td {
-    font-size: 12px; /* Smaller text for the logs */
-    padding: 8px 4px;
+    font-size: 11px;
+    padding: 6px 2px;
   }
 
-  /* 6. Footer Adjustments */
   .footer-container {
     flex-direction: column;
     text-align: center;
-    gap: 30px;
   }
-
+  
   .person-row {
     flex-direction: column;
-    align-items: center;
-    gap: 5px;
-    margin-bottom: 10px;
+    margin-bottom: 8px;
   }
+  /* --- TABLE SPACING & ALIGNMENT FIX --- */
 
-  .person-left, .person-right {
-    text-align: center !important;
-  }
+#historyTable {
+    width: 100%;
+    border-collapse: separate; /* Allows for better spacing control */
+    border-spacing: 0;
+    table-layout: auto; /* Lets columns adjust to their content */
+    margin-top: 15px;
 }
 
-/* Fix for very small screens (phones in portrait) */
-@media screen and (max-width: 480px) {
-  .header-right {
-    display: none; /* Hides GitHub/Link icons if they overlap the title */
-  }
+#historyTable th, 
+#historyTable td {
+    padding: 12px 10px; /* Adds the missing space between columns and rows */
+    text-align: left;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1); /* Subtle separator */
+    white-space: nowrap; /* Prevents text from wrapping awkwardly */
+}
+
+/* Specific mobile adjustment for the table */
+@media screen and (max-width: 768px) {
+    #historyTable th, 
+    #historyTable td {
+        padding: 8px 6px; /* Slightly tighter for mobile but still spaced */
+        font-size: 11px;
+    }
+    
+    /* Ensures the ID and Smoke columns don't touch */
+    #historyTable td:nth-child(2) {
+        padding-left: 15px; 
+    }
+}
 }
