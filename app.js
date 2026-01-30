@@ -1,245 +1,301 @@
-/* ================= NOTIFICATION ================= */
-if ("Notification" in window && Notification.permission === "default") {
-  Notification.requestPermission();
-}
 
-/* ================= CONFIG ================= */
-const SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbyNhSSPt0SDoz-aktQ4d3rslfXkviQEp7dRN9GCbJVI8Oyi1czpURe8u2lGwmxLYQZvxw/exec";
 
-const MAX_SMOKE = 700;
+const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw3YyF-hXbhDXkRosy0z45xUEvJViwqaT2-qBdSTj8JiBytKnCBl3EXoqkt3Xozm5g8/exec";
+const UPDATE_INTERVAL = 3000;
 
-/* ================= ELEMENTS ================= */
-const smokeValueEl  = document.getElementById("smokeValue");
-const lastUpdatedEl = document.getElementById("lastUpdated");
-const historyTable  = document.querySelector("#historyTable tbody");
-const smokeMeter    = document.getElementById("smokeMeter");
-const meterText     = document.getElementById("meterText");
+let lastData = null;
+let updateTimer = null;
+let commandInProgress = false;
+let lastUpdateTime = 0;
 
-/* ================= NOTIFICATION CONTROL ================= */
-let lastNotifyStatus = 0;
-
-function showSmokeNotification(smokeValue) {
-  if (Notification.permission !== "granted") return;
-
-  new Notification("🚨 Smoke Detected!", {
-    body: `Smoke level: ${smokeValue}\nLocation: HOD Cabin`,
-    icon: "logo.png",
-    vibrate: [200, 100, 200],
-    requireInteraction: true
-  });
-}
-
-/* ================= HELPER: CLEAN TIME STRINGS ================= */
-/* ================= HELPER: CLEAN TIME STRINGS ================= */
-function cleanTimestamp(val) {
-  if (!val || val === "--") return "--";
-  const str = String(val);
-  
-  // Remove any Z or timezone indicators
-  const cleaned = str.replace("Z", "").replace(".000", "");
-  
-  // If it's an ISO string (has T), extract time part
-  if (cleaned.includes("T")) {
-    return cleaned.split("T")[1].split(".")[0];
-  }
-  
-  return cleaned;
-}
-
-function cleanDate(val) {
-  if (!val || val === "--") return "--";
-  const str = String(val);
-  
-  // If it's an ISO string (has T), extract date part
-  if (str.includes("T")) {
-    const datePart = str.split("T")[0];
-    // Convert from YYYY-MM-DD to DD-MM-YYYY
-    const [year, month, day] = datePart.split("-");
-    return `${day}-${month}-${year}`;
-  }
-  
-  return str;
-}
-
-/* ================= FETCH LATEST ================= */
-async function fetchLatest() {
-  try {
-    const timestamp = new Date().getTime();
-    const res = await fetch(`${SCRIPT_URL}?action=latest&_=${timestamp}`);
-    const data = await res.json();
-    if (!data) return;
-
-    const smoke  = Number(data.smoke || 0);
-    const status = Number(data.status || 0);
-
-    /* 🔔 NOTIFICATION */
-    if (status === 1 && lastNotifyStatus !== 1) {
-      showSmokeNotification(smoke);
-    }
-    lastNotifyStatus = status;
-
-    /* VALUE - Updates the big number */
-    if (smokeValueEl) smokeValueEl.textContent = smoke;
-
-    /* TIME CLEANUP - Safe check added here! */
-    if (lastUpdatedEl) {
-        const displayDate = cleanDate(data.date);
-        const displayTime = cleanTimestamp(data.time);
-        lastUpdatedEl.textContent = `Last updated: ${displayDate} ${displayTime}`;
-    }
-
-    /* METER - This will now run correctly */
-    const percent = Math.min((smoke / MAX_SMOKE) * 100, 100);
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Dashboard starting...');
+    startDataUpdates();
+    loadHistory();
     
-    if (smokeMeter) {
-        smokeMeter.style.width = percent + "%";
+    document.getElementById('muteBtn')?.addEventListener('click', () => sendCommand(0));
+    document.getElementById('enableBtn')?.addEventListener('click', () => sendCommand(1));
+});
 
-        if (smoke < 50) {
-          smokeMeter.style.background = "#22c55e"; // Green
-          if(meterText) meterText.textContent = "LOW";
-        } else if (smoke < 120) {
-          smokeMeter.style.background = "#f3dc8f"; // Yellow
-          if(meterText) meterText.textContent = "MEDIUM";
-        } else {
-          smokeMeter.style.background = "#5a1919"; // Red
-          if(meterText) meterText.textContent = "HIGH";
+function startDataUpdates() {
+    updateData();
+    updateTimer = setInterval(updateData, UPDATE_INTERVAL);
+    setInterval(loadHistory, 15000);
+}
+
+async function updateData() {
+    if (commandInProgress) return;
+    
+    try {
+        const response = await fetch(`${GOOGLE_SCRIPT_URL}?action=latest&_=${Date.now()}`);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        
+        const data = await response.json();
+        lastData = data;
+        lastUpdateTime = Date.now();
+        
+        updateUI(data);
+    } catch (error) {
+        console.error('Update error:', error);
+        if (lastData) {
+            lastData.online = false;
+            updateUI(lastData);
         }
     }
-
-  } catch (err) {
-    console.error("Latest fetch failed:", err);
-  }
 }
 
-/* ================= FETCH HISTORY ================= */
-async function fetchHistory() {
-  try {
-    // Add cache-busting
-    const timestamp = new Date().getTime();
-    const res = await fetch(`${SCRIPT_URL}?action=history&_=${timestamp}`);
-    const rows = await res.json();
-
-    historyTable.innerHTML = "";
-
-    rows.forEach(r => {
-      const tr = document.createElement("tr");
-      const rowDate = cleanDate(r[3]);
-      const rowTime = cleanTimestamp(r[4]);
-
-      tr.innerHTML = `
-        <td>${r[0]}</td>
-        <td>${r[1]}</td>
-        <td>${r[2] == 1 ? "SMOKE" : "CLEAR"}</td>
-        <td>${rowDate}</td>
-        <td>${rowTime}</td>
-        <td>${r[5]}</td>
-      `;
-      historyTable.appendChild(tr);
+function updateUI(data) {
+    const isOnline = data.online === true && parseInt(data.seconds_since_update) < 35;
+    const isSmoke = parseInt(data.status) === 1;
+    const smokeVal = parseInt(data.smoke) || 0;
+    const isMuted = data.buzzer_state === "0";
+    const secondsSince = parseInt(data.seconds_since_update) || 999;
+    
+    // Status indicators - NORMAL COLORS (black/dark text)
+    const sysStatusEl = document.getElementById('systemStatus');
+    if (sysStatusEl) {
+        if (isOnline) {
+            sysStatusEl.innerHTML = '🟢 System Online';
+            sysStatusEl.style.cssText = 'color: #000000; background: #90EE90; padding: 8px 16px; border-radius: 20px; font-weight: bold;';
+        } else {
+            const mins = Math.floor(secondsSince / 60);
+            const timeStr = mins > 0 ? `${mins}m ago` : `${secondsSince}s ago`;
+            sysStatusEl.innerHTML = `🔴 Offline (${timeStr})`;
+            sysStatusEl.style.cssText = 'color: #000000; background: #FFB6C1; padding: 8px 16px; border-radius: 20px; font-weight: bold;';
+        }
+    }
+    
+    // Device status
+    const devStatusEl = document.getElementById('deviceStatus');
+    if (devStatusEl) {
+        devStatusEl.innerHTML = isOnline ? '🟢 Device Active' : '⚪ Device Offline';
+        devStatusEl.style.cssText = isOnline ? 'color: #000000; font-weight: bold;' : 'color: #666666;';
+    }
+    
+    // Last update text
+    const lastUpdEl = document.getElementById('lastUpdated');
+    if (lastUpdEl) {
+        lastUpdEl.textContent = isOnline ? `Live: ${data.time}` : `Last seen: ${data.time}`;
+        lastUpdEl.style.color = '#000000';
+    }
+    
+    // Smoke value - NORMAL DARK COLORS
+    const smokeEl = document.getElementById('smokeValue');
+    if (smokeEl) {
+        if (!isOnline) {
+            smokeEl.textContent = "N/A";
+            smokeEl.style.cssText = 'color: #000000; font-size: 4em; font-weight: bold;';
+        } else {
+            smokeEl.textContent = smokeVal;
+            // Use dark colors, not neon
+            if (isSmoke || smokeVal > 140) {
+                smokeEl.style.cssText = 'color: #CC0000; font-size: 4em; font-weight: bold;'; // Dark red
+            } else if (smokeVal > 80) {
+                smokeEl.style.cssText = 'color: #CC6600; font-size: 4em; font-weight: bold;'; // Dark orange
+            } else {
+                smokeEl.style.cssText = 'color: #006600; font-size: 4em; font-weight: bold;'; // Dark green
+            }
+        }
+    }
+    
+    // Progress meter
+    const meterEl = document.getElementById('smokeMeter');
+    const meterText = document.getElementById('meterText');
+    if (meterEl && meterText) {
+        if (!isOnline) {
+            meterEl.style.width = '0%';
+            meterEl.style.background = '#cccccc';
+            meterText.textContent = 'OFFLINE';
+            meterText.style.color = '#000000';
+        } else {
+            const pct = Math.min((smokeVal / 1023) * 100, 100);
+            meterEl.style.width = pct + '%';
+            
+            if (isSmoke || smokeVal > 140) {
+                meterEl.style.background = '#CC0000';
+                meterText.textContent = 'HIGH';
+            } else if (smokeVal > 80) {
+                meterEl.style.background = '#CC6600';
+                meterText.textContent = 'MEDIUM';
+            } else {
+                meterEl.style.background = '#006600';
+                meterText.textContent = 'LOW';
+            }
+            meterText.style.color = '#FFFFFF'; // White text on colored bar
+        }
+    }
+    
+    // Info fields - ALL BLACK TEXT
+    const fields = ['smokeStatus', 'deviceId', 'wifiName', 'rssiValue', 'lastEvent'];
+    const values = [
+        isOnline ? data.status_text : '--',
+        data.device || 'Unknown',
+        data.wifi || 'Unknown',
+        data.rssi ? `${data.rssi} dBm` : '--',
+        data.reason || '--'
+    ];
+    
+    fields.forEach((id, index) => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.textContent = values[index];
+            el.style.color = '#000000';
+            el.style.fontWeight = 'normal';
+        }
     });
-
-  } catch (err) {
-    console.error("History fetch failed:", err);
-  }
+    
+    // Buzzer state
+    const buzzerEl = document.getElementById('buzzerState');
+    if (buzzerEl) {
+        buzzerEl.textContent = isMuted ? 'MUTED' : 'ACTIVE';
+        buzzerEl.style.cssText = isMuted ? 'color: #CC0000; font-weight: bold;' : 'color: #006600; font-weight: bold;';
+    }
+    
+    updateButtons(isOnline, isMuted);
 }
 
-/* ================= BUZZER ================= */
-function muteBuzzer() {
-  const timestamp = new Date().getTime();
-  fetch(`${SCRIPT_URL}?action=command&buzzer=0&_=${timestamp}`);
-  alert("Buzzer muted");
+function updateButtons(online, muted) {
+    const muteBtn = document.getElementById('muteBtn');
+    const enableBtn = document.getElementById('enableBtn');
+    
+    if (!muteBtn || !enableBtn) return;
+    
+    if (!online || commandInProgress) {
+        muteBtn.disabled = true;
+        enableBtn.disabled = true;
+        muteBtn.style.opacity = '0.5';
+        enableBtn.style.opacity = '0.5';
+        return;
+    }
+    
+    muteBtn.disabled = false;
+    enableBtn.disabled = false;
+    muteBtn.style.opacity = '1';
+    enableBtn.style.opacity = '1';
+    
+    // NORMAL BUTTON COLORS (not bright neon)
+    if (muted) {
+        muteBtn.textContent = '🔕 MUTED';
+        muteBtn.style.cssText = 'background: #794141; color: #FFFFFF; padding: 15px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer;';
+        enableBtn.textContent = '🔔 ENABLE BUZZER';
+        enableBtn.style.cssText = 'background: #006600; color: #FFFFFF; padding: 15px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer;';
+    } else {
+        muteBtn.textContent = '🔕 MUTE BUZZER';
+        muteBtn.style.cssText = 'background: #CC0000; color: #FFFFFF; padding: 15px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer;';
+        enableBtn.textContent = '🔔 ENABLED';
+        enableBtn.style.cssText = 'background: #666666; color: #FFFFFF; padding: 15px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer;';
+    }
 }
 
-function enableBuzzer() {
-  const timestamp = new Date().getTime();
-  fetch(`${SCRIPT_URL}?action=command&buzzer=1&_=${timestamp}`);
-  alert("Buzzer re-enabled");
+async function sendCommand(buzzerState) {
+    if (!lastData || !lastData.online) {
+        alert('Device offline!');
+        return;
+    }
+    
+    commandInProgress = true;
+    const btn = buzzerState === 0 ? document.getElementById('muteBtn') : document.getElementById('enableBtn');
+    const originalText = btn.textContent;
+    btn.textContent = 'Processing...';
+    
+    try {
+        const url = `${GOOGLE_SCRIPT_URL}?action=command&buzzer=${buzzerState}&source=dashboard&device=${lastData.device || ''}&_=${Date.now()}`;
+        const response = await fetch(url);
+        const result = await response.text();
+        
+        if (result.includes('SUCCESS')) {
+            lastData.buzzer_state = buzzerState.toString();
+            updateUI(lastData);
+            setTimeout(updateData, 1000);
+        }
+    } catch (error) {
+        console.error('Command error:', error);
+    } finally {
+        commandInProgress = false;
+        btn.textContent = originalText;
+        updateButtons(lastData?.online, buzzerState === 0);
+    }
 }
 
-/* ================= AUTO UPDATE ================= */
-// Update more frequently
-setInterval(fetchLatest, 1500); // Changed from 1000 to 1500 to reduce load
-setInterval(fetchHistory, 8000); // Changed from 5000 to 8000
-
-// Initial load with timeout to avoid blocking
-setTimeout(() => {
-  fetchLatest();
-  fetchHistory();
-}, 500);
-/* ================= SVG PROXIMITY EFFECT ================= */
-const logo = document.getElementById("interactiveLogo");
-
-document.addEventListener("mousemove", (e) => {
-  if (!logo) return;
-
-  const rect = logo.getBoundingClientRect();
-  const cx = rect.left + rect.width / 2;
-  const cy = rect.top + rect.height / 2;
-
-  const dx = e.clientX - cx;
-  const dy = e.clientY - cy;
-  const distance = Math.sqrt(dx * dx + dy * dy);
-
-  const maxDistance = 300;
-
-  if (distance < maxDistance) {
-    const strength = (maxDistance - distance) / maxDistance;
-
-    const rotateX = (-dy / 20) * strength;
-    const rotateY = (dx / 20) * strength;
-    const scale = 1 + strength * 0.12;
-
-    logo.style.transform =
-      `perspective(600px)
-       rotateX(${rotateX}deg)
-       rotateY(${rotateY}deg)
-       scale(${scale})`;
-
-    logo.style.filter =
-      `drop-shadow(0 ${20 * strength}px ${40 * strength}px rgba(243,220,143,0.6))`;
-  } else {
-    logo.style.transform =
-      "perspective(600px) rotateX(0) rotateY(0) scale(1)";
-    logo.style.filter =
-      "drop-shadow(0 10px 30px rgba(0,0,0,0.45))";
-  }
-});
-/* ================= SVG PROXIMITY EFFECT ================= */
-const svg = document.getElementById("gmuSvg");
-
-if (svg) {
-  const core = svg.querySelector(".svg-core");
-  const ring = svg.querySelector(".svg-ring");
-
-  document.addEventListener("mousemove", (e) => {
-    const rect = svg.getBoundingClientRect();
-
-    const svgX = rect.left + rect.width / 2;
-    const svgY = rect.top + rect.height / 2;
-
-    const dx = e.clientX - svgX;
-    const dy = e.clientY - svgY;
-    const distance = Math.sqrt(dx * dx + dy * dy);
-
-    const maxDist = 300; // proximity range
-    const intensity = Math.max(0, 1 - distance / maxDist);
-
-    /* Core pulse */
-    core.style.transform = `scale(${1 + intensity * 0.15})`;
-    core.style.fill = intensity > 0.4 ? "#ffffff" : "#ffffff";
-
-    /* Ring expansion */
-    ring.style.transform = `scale(${1 + intensity * 0.25})`;
-    ring.style.strokeWidth = 6 + intensity * 6;
-
-    /* Whole SVG subtle lift */
-    svg.style.transform = `translateY(${-intensity * 10}px)`;
-  });
-
-  document.addEventListener("mouseleave", () => {
-    svg.style.transform = "translateY(0)";
-    core.style.transform = "scale(1)";
-    ring.style.transform = "scale(1)";
-  });
+// FIXED HISTORY - Only 6 columns, proper time format, normal colors
+async function loadHistory() {
+    try {
+        const response = await fetch(`${GOOGLE_SCRIPT_URL}?action=history&_=${Date.now()}`);
+        const data = await response.json();
+        const tbody = document.querySelector('#historyTable tbody');
+        
+        if (!tbody) return;
+        
+        if (!Array.isArray(data) || data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 20px; color: #000;">No events recorded</td></tr>';
+            return;
+        }
+        
+        tbody.innerHTML = data.map(row => {
+            // ONLY TAKE FIRST 6 COLUMNS: ID, Smoke, Status, Date, Time, WiFi
+            // Ignore Device (index 6) and Reason (index 7) columns
+            const id = (row[0] || '--').toString().substr(-6);
+            const smoke = (row[1] || '0').toString();
+            const status = (row[2] || '0').toString();
+            const date = (row[3] || '--').toString();
+            const rawTime = row[4] || '--';
+            const wifi = (row[5] || 'Unknown').toString();
+            
+            // FIX TIME FORMAT: Extract HH:mm:ss from ugly date string
+            const time = formatTime(rawTime);
+            
+            const isSmoke = status === '1';
+            const smokeNum = parseInt(smoke) || 0;
+            
+            // NORMAL COLORS (dark, readable)
+            const smokeColor = smokeNum > 140 ? '#CC0000' : smokeNum > 80 ? '#CC6600' : '#006600';
+            const bgColor = isSmoke ? '#FFCCCC' : '#CCFFCC';
+            const textColor = isSmoke ? '#990000' : '#006600';
+            
+            return `
+                <tr style="border-bottom: 1px solid #ddd; background: #ffffff;">
+                    <td style="padding: 10px; color: #000000; font-family: monospace; font-size: 0.9em;">${id}</td>
+                    <td style="padding: 10px; color: ${smokeColor}; font-weight: bold;">${smoke}</td>
+                    <td style="padding: 10px;">
+                        <span style="background: ${bgColor}; color: ${textColor}; padding: 4px 8px; border-radius: 4px; font-weight: bold; border: 1px solid #999;">
+                            ${isSmoke ? 'SMOKE' : 'CLEAR'}
+                        </span>
+                    </td>
+                    <td style="padding: 10px; color: #000000;">${date}</td>
+                    <td style="padding: 10px; color: #000000; font-family: monospace; font-weight: bold;">${time}</td>
+                    <td style="padding: 10px; color: #000000;">${wifi}</td>
+                </tr>
+            `;
+        }).join('');
+        
+    } catch (error) {
+        console.error('History error:', error);
+    }
 }
 
+// Helper: Extract clean time from messy date string
+function formatTime(timeValue) {
+    if (!timeValue || timeValue === '--') return '--:--:--';
+    
+    // If it's already simple HH:mm:ss, return it
+    if (typeof timeValue === 'string' && /^\d{1,2}:\d{2}:\d{2}$/.test(timeValue)) {
+        return timeValue;
+    }
+    
+    // If it's the ugly "Sat Dec 30 1899..." format, extract time
+    if (typeof timeValue === 'string') {
+        // Try to match HH:mm:ss pattern
+        const match = timeValue.match(/(\d{1,2}):(\d{2}):(\d{2})/);
+        if (match) {
+            return `${match[1].padStart(2, '0')}:${match[2]}:${match[3]}`;
+        }
+    }
+    
+    // If it's a Date object or timestamp
+    if (typeof timeValue === 'number' || timeValue instanceof Date) {
+        const d = new Date(timeValue);
+        return d.toTimeString().substr(0, 8);
+    }
+    
+    return timeValue.toString();
+}
