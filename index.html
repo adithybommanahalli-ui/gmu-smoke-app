@@ -50,15 +50,16 @@
   <!-- LEFT : SMOKE LEVEL -->
   <div class="card">
     <h2>Smoke Level</h2>
-    <div class="value" id="smokeValue"></div>
+    <div class="value" id="smokeValue">0</div>
 
     <div class="meter">
       <div class="meter-fill" id="smokeMeter"></div>
     </div>
 
     <p class="meter-label">
-      Intensity: <span id="meterText"></span>
+      Intensity: <span id="meterText">LOW</span>
     </p>
+    <p class="last-updated" id="lastUpdated">Last updated: --</p>
   </div>
 
   <!-- CENTER : PURE SVG (NO CARD) -->
@@ -70,16 +71,16 @@
   <div class="card actions">
     <h2>Buzzer Control</h2>
 
-    <button onclick="muteBuzzer()" style="margin-bottom:12px;">
+    <button id="muteBtn" onclick="muteBuzzer()" style="margin-bottom:12px;">
       Mute Buzzer
     </button>
 
-    <button onclick="enableBuzzer()" style="background:#22c55e;color:white;">
+    <button id="enableBtn" onclick="enableBuzzer()" style="background:#22c55e;color:white;">
       Reset / Enable Buzzer
     </button>
+    
+    <p id="systemStatus" style="margin-top:15px;font-size:14px;color:#22c55e;">✅ System Online</p>
   </div>
-
-
 
   <!-- HISTORY TABLE -->
   <div class="card" style="grid-column:1/-1">
@@ -131,7 +132,6 @@
     <div class="person-row">
       <span class="person-left">Project Coordinator</span>
       <span class="person-right">Ms. Nanditha G</span>
-      
     </div>
   </div>
 <div style="margin-bottom: 20px;"></div>
@@ -163,14 +163,13 @@
   </div>
 
 </div>
-</div>
+
     <!-- CONTACT -->
     <div class="footer-section contact-section">
       <h3>Contact</h3>
       <p>
         Email:
        <a href="https://mail.google.com/mail/?view=cm&fs=1&to=iotsmokedetector@gmail.com" target="_blank"> iotsmokedetector@gmail.com </a>
-        </a>
       </p>
       <p>Phone: +91 91484 82960</p>
       <p>
