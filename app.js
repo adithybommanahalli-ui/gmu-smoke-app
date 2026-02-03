@@ -1,110 +1,556 @@
-
+/*******************************************************
+ * GMU SMOKE MONITORING DASHBOARD - APP.JS
+ * VERSION: 6.2 - Added Pan/Zoom for Historical Data
+ *******************************************************/
 
 const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw3YyF-hXbhDXkRosy0z45xUEvJViwqaT2-qBdSTj8JiBytKnCBl3EXoqkt3Xozm5g8/exec";
 const UPDATE_INTERVAL = 3000;
 
-// Notification state
 let notificationPermission = false;
 let lastNotificationTime = 0;
-const NOTIFICATION_COOLDOWN = 600000; // 10 minutes between notifications
-let lastSmokeStatus = false; // Track to detect transitions
+const NOTIFICATION_COOLDOWN = 600000;
+let lastSmokeStatus = false;
 
 let lastData = null;
 let updateTimer = null;
-let commandInProgress = false;
+commandInProgress = false;
 let lastUpdateTime = 0;
 
-// Initialize on load
-document.addEventListener('DOMContentLoaded', function() {
+/* ================= TIME RANGE CONFIGURATION ================= */
+
+const TIME_RANGES = {
+    '5m': { 
+        label: 'Last 5 Minutes', 
+        intervalMs: 5000,
+        maxPoints: 60,
+        liveOnly: true
+    },
+    '1h': { 
+        label: 'Last 1 Hour', 
+        intervalMs: 60000,
+        maxPoints: 60,
+        historyHours: 1
+    },
+    '1d': { 
+        label: 'Last 24 Hours', 
+        intervalMs: 300000,
+        maxPoints: 288,
+        historyHours: 24
+    },
+    '1w': { 
+        label: 'Last 1 Week', 
+        intervalMs: 3600000,
+        maxPoints: 168,
+        historyHours: 168
+    },
+    'all': { 
+        label: 'All Time', 
+        intervalMs: 86400000,
+        maxPoints: 365,
+        historyHours: 8760
+    }
+};
+
+let currentRange = '1h';
+let historicalData = [];
+let liveDataBuffer = [];
+let smokeChart = null;
+let isHistoryLoaded = false;
+let isAutoScroll = true;  // Auto-scroll to latest by default
+
+/* ================= INITIALIZATION ================= */
+
+document.addEventListener('DOMContentLoaded', async function() {
     console.log('Dashboard starting...');
     
-    // Setup notifications
     initNotifications();
+    await initSmokeChart();  // Wait for chart init
+    initTimeRangeControls();
+    initPanControls();       // NEW: Pan/zoom controls
+    
+    await loadHistoricalData();
+    isHistoryLoaded = true;
+    updateAggregatedGraph();
     
     startDataUpdates();
-    loadHistory();
     
     document.getElementById('muteBtn')?.addEventListener('click', () => sendCommand(0));
     document.getElementById('enableBtn')?.addEventListener('click', () => sendCommand(1));
 });
 
-/* ================= BROWSER NOTIFICATIONS ================= */
+/* ================= HISTORICAL DATA ================= */
 
-function initNotifications() {
-    if (!("Notification" in window)) {
-        console.log("Browser does not support notifications");
-        updateNotificationStatus("unsupported");
-        return;
-    }
-    
-    // Check permission
-    if (Notification.permission === "granted") {
-        notificationPermission = true;
-        updateNotificationStatus("enabled");
-    } else if (Notification.permission !== "denied") {
-        // Request permission
-        Notification.requestPermission().then(permission => {
-            if (permission === "granted") {
-                notificationPermission = true;
-                updateNotificationStatus("enabled");
-                showToast("Notifications enabled!", "success");
-            } else {
-                updateNotificationStatus("disabled");
-            }
-        });
-    } else {
-        updateNotificationStatus("blocked");
-    }
-}
-
-function updateNotificationStatus(status) {
-    const indicator = document.getElementById('notificationStatus');
-    if (!indicator) return;
-    
-    if (status === "enabled") {
-        indicator.innerHTML = "🔔 Notifications On";
-        indicator.style.cssText = "color: #006600; background: #90EE90; padding: 5px 10px; border-radius: 5px; font-size: 0.8em;";
-    } else if (status === "disabled" || status === "blocked") {
-        indicator.innerHTML = "🔕 Notifications Off";
-        indicator.style.cssText = "color: #666; background: #eee; padding: 5px 10px; border-radius: 5px; font-size: 0.8em;";
-    } else {
-        indicator.innerHTML = "⚠️ Notifications Unsupported";
-        indicator.style.cssText = "color: #999; background: #f5f5f5; padding: 5px 10px; border-radius: 5px; font-size: 0.8em;";
+async function loadHistoricalData() {
+    try {
+        console.log('Loading historical data...');
+        const response = await fetch(`${GOOGLE_SCRIPT_URL}?action=history&limit=5000&_=${Date.now()}`);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        
+        const rows = await response.json();
+        
+        if (!Array.isArray(rows) || rows.length === 0) {
+            historicalData = [];
+            return;
+        }
+        
+        historicalData = rows.map(row => {
+            const id = row[0];
+            const smoke = parseInt(row[1]) || 0;
+            const status = row[2];
+            const dateStr = row[3];
+            const timeStr = row[4];
+            const timestamp = parseDateTime(dateStr, timeStr);
+            
+            return { timestamp, value: smoke, status, id };
+        }).filter(item => !isNaN(item.timestamp) && item.timestamp > 0)
+          .sort((a, b) => a.timestamp - b.timestamp);
+        
+        console.log(`Loaded ${historicalData.length} historical records`);
+        
+    } catch (error) {
+        console.error('Failed to load historical data:', error);
+        historicalData = [];
     }
 }
 
-function sendSmokeNotification(smokeValue, deviceName) {
-    if (!notificationPermission) return;
+function parseDateTime(dateStr, timeStr) {
+    try {
+        const dateParts = dateStr.split('-');
+        if (dateParts.length !== 3) return null;
+        
+        const day = parseInt(dateParts[0]);
+        const month = parseInt(dateParts[1]) - 1;
+        const year = parseInt(dateParts[2]);
+        
+        const timeParts = timeStr.split(':');
+        const hours = parseInt(timeParts[0]) || 0;
+        const minutes = parseInt(timeParts[1]) || 0;
+        const seconds = parseInt(timeParts[2]) || 0;
+        
+        return new Date(year, month, day, hours, minutes, seconds).getTime();
+    } catch (e) {
+        return null;
+    }
+}
+
+/* ================= LIVE DATA ================= */
+
+function addLiveDataPoint(timestamp, value) {
+    liveDataBuffer.push({ timestamp, value: Number(value) });
+    
+    // Keep 2 hours max
+    const cutoff = Date.now() - (2 * 60 * 60 * 1000);
+    const cutoffIndex = liveDataBuffer.findIndex(p => p.timestamp >= cutoff);
+    if (cutoffIndex > 0) {
+        liveDataBuffer = liveDataBuffer.slice(cutoffIndex);
+    }
+}
+
+/* ================= AGGREGATION ================= */
+
+function getAllDataForRange(rangeKey) {
+    const config = TIME_RANGES[rangeKey];
+    const now = Date.now();
+    const rangeStart = now - (config.maxPoints * config.intervalMs);
+    
+    let combinedData = [];
+    
+    if (config.liveOnly) {
+        combinedData = liveDataBuffer.filter(p => p.timestamp >= rangeStart);
+    } else {
+        const relevantHistory = historicalData.filter(p => 
+            p.timestamp >= rangeStart && p.timestamp < now
+        );
+        combinedData = [...relevantHistory, ...liveDataBuffer];
+    }
+    
+    return combinedData.sort((a, b) => a.timestamp - b.timestamp);
+}
+
+function aggregateData(rangeKey) {
+    const config = TIME_RANGES[rangeKey];
+    const data = getAllDataForRange(rangeKey);
+    
+    if (data.length === 0) return generateEmptyTimeline(rangeKey);
     
     const now = Date.now();
+    const intervalMs = config.intervalMs;
+    const buckets = new Map();
     
-    // Prevent spam: Only notify once every 10 minutes for same event type
-    if (now - lastNotificationTime < NOTIFICATION_COOLDOWN) {
-        console.log("Notification skipped (cooldown)");
+    data.forEach(point => {
+        const bucketTime = Math.floor(point.timestamp / intervalMs) * intervalMs;
+        
+        if (!buckets.has(bucketTime)) {
+            buckets.set(bucketTime, { sum: 0, count: 0, timestamp: bucketTime });
+        }
+        const bucket = buckets.get(bucketTime);
+        bucket.sum += point.value;
+        bucket.count++;
+    });
+    
+    const result = [];
+    const endBucket = Math.floor(now / intervalMs) * intervalMs;
+    const startBucket = endBucket - ((config.maxPoints - 1) * intervalMs);
+    
+    for (let t = startBucket; t <= endBucket; t += intervalMs) {
+        const bucket = buckets.get(t);
+        const avgValue = bucket ? Math.round(bucket.sum / bucket.count) : null;
+        
+        result.push({
+            label: formatTimeLabel(t, rangeKey),
+            value: avgValue,
+            timestamp: t,
+            hasData: bucket !== undefined
+        });
+    }
+    
+    return interpolateGaps(result);
+}
+
+function generateEmptyTimeline(rangeKey) {
+    const config = TIME_RANGES[rangeKey];
+    const now = Date.now();
+    const intervalMs = config.intervalMs;
+    
+    const result = [];
+    const endBucket = Math.floor(now / intervalMs) * intervalMs;
+    const startBucket = endBucket - ((config.maxPoints - 1) * intervalMs);
+    
+    for (let t = startBucket; t <= endBucket; t += intervalMs) {
+        result.push({
+            label: formatTimeLabel(t, rangeKey),
+            value: 0,
+            timestamp: t,
+            hasData: false
+        });
+    }
+    return result;
+}
+
+function interpolateGaps(dataPoints) {
+    let lastKnownValue = null;
+    
+    for (let i = 0; i < dataPoints.length; i++) {
+        if (dataPoints[i].value !== null) {
+            lastKnownValue = dataPoints[i].value;
+        } else if (lastKnownValue !== null) {
+            dataPoints[i].value = lastKnownValue;
+        }
+    }
+    
+    let nextKnownValue = null;
+    for (let i = dataPoints.length - 1; i >= 0; i--) {
+        if (dataPoints[i].hasData) {
+            nextKnownValue = dataPoints[i].value;
+        } else if (nextKnownValue !== null && dataPoints[i].value === null) {
+            dataPoints[i].value = nextKnownValue;
+        }
+    }
+    
+    dataPoints.forEach(p => { if (p.value === null) p.value = 0; });
+    return dataPoints;
+}
+
+function formatTimeLabel(timestamp, rangeKey) {
+    const date = new Date(timestamp);
+    switch(rangeKey) {
+        case '5m': return date.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        case '1h': return date.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
+        case '1d': return date.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
+        case '1w': return date.toLocaleString('en-US', { weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false });
+        case 'all': return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        default: return date.toLocaleTimeString();
+    }
+}
+
+/* ================= CHART WITH PAN/ZOOM ================= */
+
+async function initSmokeChart() {
+    const ctx = document.getElementById('smokeChart');
+    if (!ctx) return;
+    
+    // Load Chart.js Zoom plugin dynamically
+    await loadChartZoomPlugin();
+    
+    smokeChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [{
+                label: 'Smoke Level (Avg)',
+                data: [],
+                borderColor: '#FFD54F',
+                backgroundColor: 'rgba(255, 213, 79, 0.1)',
+                borderWidth: 2,
+                tension: 0.4,
+                fill: true,
+                pointRadius: 0,
+                pointHoverRadius: 5,
+                pointHitRadius: 20,
+                spanGaps: true
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: false,
+            interaction: {
+                mode: 'index',
+                intersect: false
+            },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    enabled: true,
+                    backgroundColor: 'rgba(0,0,0,0.8)',
+                    titleFont: { size: 12 },
+                    bodyFont: { size: 14, weight: 'bold' },
+                    callbacks: {
+                        label: function(context) {
+                            return `Avg Smoke: ${context.parsed.y}`;
+                        }
+                    }
+                },
+                // ZOOM PLUGIN CONFIGURATION
+                zoom: {
+                    pan: {
+                        enabled: true,
+                        mode: 'x',
+                        modifierKey: null, // No key required, just drag
+                        onPan: () => { isAutoScroll = false; updatePanButtons(); }
+                    },
+                    zoom: {
+                        wheel: { enabled: true },
+                        pinch: { enabled: true },
+                        mode: 'x',
+                        onZoom: () => { isAutoScroll = false; updatePanButtons(); }
+                    },
+                    limits: {
+                        x: { min: 'original', max: 'original' },
+                        y: { min: 0, max: 500 }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    suggestedMax: 400,
+                    grid: { color: 'rgba(255,255,255,0.1)', drawBorder: false },
+                    ticks: { color: 'rgba(255,255,255,0.7)', font: { size: 11 } }
+                },
+                x: {
+                    grid: { display: false },
+                    ticks: { 
+                        color: 'rgba(255,255,255,0.7)', 
+                        font: { size: 10 },
+                        maxRotation: 45,
+                        autoSkip: true,
+                        maxTicksLimit: 10
+                    }
+                }
+            }
+        }
+    });
+}
+
+function loadChartZoomPlugin() {
+    return new Promise((resolve, reject) => {
+        if (window.ChartZoom) return resolve();
+        
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js';
+        script.onload = resolve;
+        script.onerror = reject;
+        document.head.appendChild(script);
+    });
+}
+
+function updateAggregatedGraph() {
+    if (!smokeChart || !isHistoryLoaded) return;
+    
+    const aggregated = aggregateData(currentRange);
+    const labels = aggregated.map(p => p.label);
+    const values = aggregated.map(p => p.value);
+    
+    // Check if changed
+    if (JSON.stringify(smokeChart.data.labels) === JSON.stringify(labels) &&
+        JSON.stringify(smokeChart.data.datasets[0].data) === JSON.stringify(values)) {
         return;
     }
     
-    // Optionally: Only notify if tab is not visible
-    // if (document.visibilityState === 'visible') return;
+    smokeChart.data.labels = labels;
+    smokeChart.data.datasets[0].data = values;
     
-    const notification = new Notification("🚨 SMOKE DETECTED!", {
-        body: `Smoke level: ${smokeValue} at ${deviceName || 'GMU HOD Cabin'}\nClick to view dashboard`,
-        icon: "https://cdn-icons-png.flaticon.com/512/2933/2933245.png", // Smoke/fire icon
-        badge: "https://cdn-icons-png.flaticon.com/512/2933/2933245.png",
-        tag: "smoke-alert", // Prevents duplicate notifications
-        requireInteraction: true, // Stays until user clicks
-        silent: false,
-        vibrate: [200, 100, 200]
-    });
+    // Handle auto-scroll to latest
+    if (isAutoScroll && smokeChart.options.plugins.zoom) {
+        // Reset zoom to show latest data
+        smokeChart.resetZoom();
+    }
     
-    notification.onclick = function() {
-        window.focus();
-        notification.close();
-    };
-    
-    lastNotificationTime = now;
-    console.log("Smoke notification sent");
+    smokeChart.update('none');
 }
+
+/* ================= PAN CONTROL BUTTONS ================= */
+
+function initPanControls() {
+    const chartCard = document.getElementById('smokeChart')?.closest('.card');
+    if (!chartCard) return;
+    
+    // Create control bar below chart
+    const controlBar = document.createElement('div');
+    controlBar.id = 'panControlBar';
+    controlBar.style.cssText = `
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 10px;
+        margin-top: 10px;
+        padding: 8px;
+        background: rgba(0,0,0,0.2);
+        border-radius: 8px;
+    `;
+    
+    controlBar.innerHTML = `
+        <button onclick="panChart('left')" id="panLeftBtn" style="
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.3);
+            color: #fff;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        ">◀ Older</button>
+        
+        <button onclick="resetChartView()" id="resetViewBtn" style="
+            background: ${isAutoScroll ? 'rgba(255, 213, 79, 0.3)' : 'rgba(255,255,255,0.1)'};
+            border: 1px solid ${isAutoScroll ? '#FFD54F' : 'rgba(255,255,255,0.3)'};
+            color: ${isAutoScroll ? '#FFD54F' : '#fff'};
+            padding: 6px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: ${isAutoScroll ? 'bold' : 'normal'};
+        ">${isAutoScroll ? '⏸ Live' : '▶ Live'}</button>
+        
+        <button onclick="panChart('right')" id="panRightBtn" style="
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.3);
+            color: #fff;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        ">Newer ▶</button>
+    `;
+    
+    const container = chartCard.querySelector('.chart-container');
+    if (container) {
+        container.after(controlBar);
+    }
+}
+
+function updatePanButtons() {
+    const btn = document.getElementById('resetViewBtn');
+    if (btn) {
+        btn.style.background = isAutoScroll ? 'rgba(255, 213, 79, 0.3)' : 'rgba(255,255,255,0.1)';
+        btn.style.borderColor = isAutoScroll ? '#FFD54F' : 'rgba(255,255,255,0.3)';
+        btn.style.color = isAutoScroll ? '#FFD54F' : '#fff';
+        btn.style.fontWeight = isAutoScroll ? 'bold' : 'normal';
+        btn.textContent = isAutoScroll ? '⏸ Live' : '▶ Live';
+    }
+}
+
+window.panChart = function(direction) {
+    if (!smokeChart) return;
+    
+    isAutoScroll = false;
+    updatePanButtons();
+    
+    const chart = smokeChart;
+    const xScale = chart.scales.x;
+    const range = xScale.max - xScale.min;
+    const panAmount = range * 0.2; // Pan 20% of visible range
+    
+    if (direction === 'left') {
+        // Pan to older data (decrease min/max)
+        chart.zoomScale('x', { min: xScale.min - panAmount, max: xScale.max - panAmount }, 'default');
+    } else {
+        // Pan to newer data (increase min/max)
+        chart.zoomScale('x', { min: xScale.min + panAmount, max: xScale.max + panAmount }, 'default');
+    }
+};
+
+window.resetChartView = function() {
+    if (!smokeChart) return;
+    isAutoScroll = true;
+    smokeChart.resetZoom();
+    updatePanButtons();
+};
+
+/* ================= TIME RANGE CONTROLS ================= */
+
+function initTimeRangeControls() {
+    const chartCard = document.getElementById('smokeChart')?.closest('.card');
+    if (!chartCard) return;
+    
+    let controls = document.getElementById('timeRangeControls');
+    if (!controls) {
+        controls = document.createElement('div');
+        controls.id = 'timeRangeControls';
+        controls.style.cssText = `
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+            justify-content: center;
+        `;
+        
+        const title = chartCard.querySelector('h2');
+        if (title) title.after(controls);
+    }
+    
+    renderRangeButtons();
+}
+
+function renderRangeButtons() {
+    const controls = document.getElementById('timeRangeControls');
+    if (!controls) return;
+    
+    controls.innerHTML = Object.entries(TIME_RANGES).map(([key, config]) => `
+        <button 
+            onclick="window.setTimeRange('${key}')"
+            id="range-${key}"
+            style="
+                padding: 6px 16px;
+                border: 1px solid ${key === currentRange ? '#FFD54F' : 'rgba(255,255,255,0.3)'};
+                background: ${key === currentRange ? 'rgba(255, 213, 79, 0.2)' : 'transparent'};
+                color: ${key === currentRange ? '#FFD54F' : '#fff'};
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 12px;
+                font-weight: ${key === currentRange ? 'bold' : 'normal'};
+                transition: all 0.2s;
+            "
+        >
+            ${config.label}
+        </button>
+    `).join('');
+}
+
+window.setTimeRange = function(rangeKey) {
+    if (!TIME_RANGES[rangeKey] || rangeKey === currentRange) return;
+    
+    currentRange = rangeKey;
+    renderRangeButtons();
+    
+    // Reset view when changing time range
+    isAutoScroll = true;
+    if (smokeChart) smokeChart.resetZoom();
+    updatePanButtons();
+    
+    updateAggregatedGraph();
+    console.log(`Switched to ${TIME_RANGES[rangeKey].label}`);
+};
 
 /* ================= DATA UPDATES ================= */
 
@@ -126,15 +572,16 @@ async function updateData() {
         lastData = data;
         lastUpdateTime = Date.now();
         
-        // Check for smoke START transition (for notification)
         const currentSmoke = data.status === "1" || data.status === 1;
         if (currentSmoke && !previousSmoke && !lastSmokeStatus) {
-            // New smoke event detected
             sendSmokeNotification(data.smoke, data.device);
         }
         lastSmokeStatus = currentSmoke;
         
         updateUI(data);
+        addLiveDataPoint(Date.now(), data.smoke);
+        updateAggregatedGraph();
+
     } catch (error) {
         console.error('Update error:', error);
         if (lastData) {
@@ -144,7 +591,7 @@ async function updateData() {
     }
 }
 
-/* ================= UI UPDATES ================= */
+/* ================= UI UPDATES (UNCHANGED) ================= */
 
 function updateUI(data) {
     const isOnline = data.online === true && parseInt(data.seconds_since_update) < 35;
@@ -153,7 +600,6 @@ function updateUI(data) {
     const isMuted = data.buzzer_state === "0";
     const secondsSince = parseInt(data.seconds_since_update) || 999;
     
-    // System Status
     const sysStatusEl = document.getElementById('systemStatus');
     if (sysStatusEl) {
         if (isOnline) {
@@ -167,21 +613,18 @@ function updateUI(data) {
         }
     }
     
-    // Device status
     const devStatusEl = document.getElementById('deviceStatus');
     if (devStatusEl) {
         devStatusEl.innerHTML = isOnline ? '🟢 Device Active' : '⚪ Device Offline';
         devStatusEl.style.cssText = isOnline ? 'color: #000; font-weight: bold;' : 'color: #666;';
     }
     
-    // Last update
     const lastUpdEl = document.getElementById('lastUpdated');
     if (lastUpdEl) {
         lastUpdEl.textContent = isOnline ? `Live: ${data.time}` : `Last seen: ${data.time}`;
         lastUpdEl.style.color = '#000';
     }
     
-    // Smoke value
     const smokeEl = document.getElementById('smokeValue');
     if (smokeEl) {
         if (!isOnline) {
@@ -199,7 +642,6 @@ function updateUI(data) {
         }
     }
     
-    // Progress meter
     const meterEl = document.getElementById('smokeMeter');
     const meterText = document.getElementById('meterText');
     if (meterEl && meterText) {
@@ -226,7 +668,6 @@ function updateUI(data) {
         }
     }
     
-    // Info fields
     const fields = {
         'smokeStatus': isOnline ? data.status_text : '--',
         'deviceId': data.device || 'Unknown',
@@ -243,7 +684,6 @@ function updateUI(data) {
         }
     }
     
-    // Buzzer state
     const buzzerEl = document.getElementById('buzzerState');
     if (buzzerEl) {
         buzzerEl.textContent = isMuted ? 'MUTED' : 'ACTIVE';
@@ -315,76 +755,82 @@ async function sendCommand(buzzerState) {
     }
 }
 
-/* ================= HISTORY TABLE ================= */
+/* ================= NOTIFICATIONS & HISTORY ================= */
 
-async function loadHistory() {
-    try {
-        const response = await fetch(`${GOOGLE_SCRIPT_URL}?action=history&_=${Date.now()}`);
-        const data = await response.json();
-        const tbody = document.querySelector('#historyTable tbody');
-        
-        if (!tbody) return;
-        
-        if (!Array.isArray(data) || data.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 20px; color: #000;">No events recorded</td></tr>';
-            return;
-        }
-        
-        tbody.innerHTML = data.map(row => {
-            // ONLY 6 COLUMNS: ID, Smoke, Status, Date, Time, WiFi
-            const id = (row[0] || '--').toString().substr(-6);
-            const smoke = (row[1] || '0').toString();
-            const status = (row[2] || '0').toString();
-            const date = (row[3] || '--').toString();
-            const rawTime = row[4] || '--';
-            const wifi = (row[5] || 'Unknown').toString();
-            
-            const time = formatTime(rawTime);
-            const isSmoke = status === '1';
-            const smokeNum = parseInt(smoke) || 0;
-            
-            const smokeColor = smokeNum > 140 ? '#CC0000' : smokeNum > 80 ? '#CC6600' : '#006600';
-            const bgColor = isSmoke ? '#FFCCCC' : '#CCFFCC';
-            const textColor = isSmoke ? '#990000' : '#006600';
-            
-            return `
-                <tr style="border-bottom: 1px solid #ddd; background: #fff;">
-                    <td style="padding: 10px; color: #000; font-family: monospace; font-size: 0.9em;">${id}</td>
-                    <td style="padding: 10px; color: ${smokeColor}; font-weight: bold;">${smoke}</td>
-                    <td style="padding: 10px;">
-                        <span style="background: ${bgColor}; color: ${textColor}; padding: 4px 8px; border-radius: 4px; font-weight: bold; border: 1px solid #999;">
-                            ${isSmoke ? 'SMOKE' : 'CLEAR'}
-                        </span>
-                    </td>
-                    <td style="padding: 10px; color: #000;">${date}</td>
-                    <td style="padding: 10px; color: #000; font-family: monospace; font-weight: bold;">${time}</td>
-                    <td style="padding: 10px; color: #000;">${wifi}</td>
-                </tr>
-            `;
-        }).join('');
-        
-    } catch (error) {
-        console.error('History error:', error);
+function initNotifications() {
+    if (!("Notification" in window)) {
+        updateNotificationStatus("unsupported");
+        return;
+    }
+    
+    if (Notification.permission === "granted") {
+        notificationPermission = true;
+        updateNotificationStatus("enabled");
+    } else if (Notification.permission !== "denied") {
+        Notification.requestPermission().then(permission => {
+            if (permission === "granted") {
+                notificationPermission = true;
+                updateNotificationStatus("enabled");
+                showToast("Notifications enabled!", "success");
+            } else {
+                updateNotificationStatus("disabled");
+            }
+        });
+    } else {
+        updateNotificationStatus("blocked");
     }
 }
 
-function formatTime(timeValue) {
-    if (!timeValue || timeValue === '--') return '--:--:--';
-    if (typeof timeValue === 'string' && /^\d{1,2}:\d{2}:\d{2}$/.test(timeValue)) {
-        return timeValue;
-    }
-    if (typeof timeValue === 'string') {
-        const match = timeValue.match(/(\d{1,2}):(\d{2}):(\d{2})/);
-        if (match) return `${match[1].padStart(2, '0')}:${match[2]}:${match[3]}`;
-    }
-    if (typeof timeValue === 'number' || timeValue instanceof Date) {
-        const d = new Date(timeValue);
-        return d.toTimeString().substr(0, 8);
-    }
-    return timeValue.toString();
+function updateNotificationStatus(status) {
+    const indicator = document.getElementById('notificationStatus');
+    if (!indicator) return;
+    
+    const styles = {
+        enabled: "color: #006600; background: #90EE90; padding: 5px 10px; border-radius: 5px; font-size: 0.8em;",
+        disabled: "color: #666; background: #eee; padding: 5px 10px; border-radius: 5px; font-size: 0.8em;",
+        blocked: "color: #666; background: #eee; padding: 5px 10px; border-radius: 5px; font-size: 0.8em;",
+        unsupported: "color: #999; background: #f5f5f5; padding: 5px 10px; border-radius: 5px; font-size: 0.8em;"
+    };
+    
+    const labels = {
+        enabled: "🔔 Notifications On",
+        disabled: "🔕 Notifications Off",
+        blocked: "🔕 Notifications Off",
+        unsupported: "⚠️ Notifications Unsupported"
+    };
+    
+    indicator.innerHTML = labels[status];
+    indicator.style.cssText = styles[status];
 }
 
-// Toast notifications (in-page)
+function sendSmokeNotification(smokeValue, deviceName) {
+    if (!notificationPermission) return;
+    
+    const now = Date.now();
+    if (now - lastNotificationTime < NOTIFICATION_COOLDOWN) {
+        console.log("Notification skipped (cooldown)");
+        return;
+    }
+    
+    const notification = new Notification("🚨 SMOKE DETECTED!", {
+        body: `Smoke level: ${smokeValue} at ${deviceName || 'GMU HOD Cabin'}\nClick to view dashboard`,
+        icon: "https://cdn-icons-png.flaticon.com/512/2933/2933245.png ",
+        badge: "https://cdn-icons-png.flaticon.com/512/2933/2933245.png ",
+        tag: "smoke-alert",
+        requireInteraction: true,
+        silent: false,
+        vibrate: [200, 100, 200]
+    });
+    
+    notification.onclick = function() {
+        window.focus();
+        notification.close();
+    };
+    
+    lastNotificationTime = now;
+    console.log("Smoke notification sent");
+}
+
 function showToast(msg, type) {
     const existing = document.querySelector('.toast');
     if (existing) existing.remove();
@@ -415,7 +861,98 @@ function showToast(msg, type) {
     }, 3000);
 }
 
-// Add pulse animation to style
+async function loadHistory() {
+    try {
+        const response = await fetch(`${GOOGLE_SCRIPT_URL}?action=history&_=${Date.now()}`);
+        const data = await response.json();
+        const last20 = data.slice(0, 20);
+        const cleanedData = deduplicateEvents(last20);
+        const tbody = document.querySelector('#historyTable tbody');
+        
+        if (!tbody) return;
+        
+        if (!Array.isArray(cleanedData) || cleanedData.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding: 20px; color: #000;">No events recorded</td></tr>`;
+            return;
+        }
+        
+        tbody.innerHTML = cleanedData.map(row => {
+            const id = (row[0] || '--').toString().slice(-6);
+            const smoke = (row[1] || '0').toString();
+            const status = (row[2] || '0').toString();
+            const date = formatDate(row[3]);
+            const time = formatTime(row[4]);
+            const wifi = (row[5] || 'Unknown').toString();
+            const isSmoke = status === '1';
+            const smokeNum = parseInt(smoke) || 0;
+            const smokeColor = smokeNum > 140 ? '#CC0000' : smokeNum > 80 ? '#CC6600' : '#006600';
+            const bgColor = isSmoke ? '#FFCCCC' : '#CCFFCC';
+            const textColor = isSmoke ? '#990000' : '#006600';
+
+            return `
+                <tr style="border-bottom: 1px solid #ddd; background: #fff;">
+                    <td style="padding: 10px; color: #000; font-family: monospace; font-size: 0.9em;">${id}</td>
+                    <td style="padding: 10px; color: ${smokeColor}; font-weight: bold;">${smoke}</td>
+                    <td style="padding: 10px;">
+                        <span style="background: ${bgColor}; color: ${textColor}; padding: 4px 8px; border-radius: 4px; font-weight: bold; border: 1px solid #999;">
+                            ${isSmoke ? 'SMOKE' : 'CLEAR'}
+                        </span>
+                    </td>
+                    <td style="padding: 10px; color: #000;">${date}</td>
+                    <td style="padding: 10px; color: #000; font-family: monospace; font-weight: bold;">${time}</td>
+                    <td style="padding: 10px; color: #000;">${wifi}</td>
+                </tr>
+            `;
+        }).join('');
+        
+    } catch (error) {
+        console.error('History error:', error);
+    }
+}
+
+function deduplicateEvents(rows) {
+    const result = [];
+    let lastKey = null;
+    for (const row of rows) {
+        const status = row[2];
+        const date = row[3];
+        const key = `${status}_${date}`;
+        if (key === lastKey) continue;
+        result.push(row);
+        lastKey = key;
+    }
+    return result;
+}
+
+function formatDate(dateValue) {
+    if (!dateValue) return '--';
+    if (typeof dateValue === 'string' && /^\d{2}-\d{2}-\d{4}$/.test(dateValue)) return dateValue;
+    try {
+        const d = new Date(dateValue);
+        if (isNaN(d.getTime())) return '--';
+        const day = String(d.getDate()).padStart(2, '0');
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const year = d.getFullYear();
+        return `${day}-${month}-${year}`;
+    } catch (e) {
+        return '--';
+    }
+}
+
+function formatTime(timeValue) {
+    if (!timeValue || timeValue === '--') return '--:--:--';
+    if (typeof timeValue === 'string' && /^\d{1,2}:\d{2}:\d{2}$/.test(timeValue)) return timeValue;
+    if (typeof timeValue === 'string') {
+        const match = timeValue.match(/(\d{1,2}):(\d{2}):(\d{2})/);
+        if (match) return `${match[1].padStart(2, '0')}:${match[2]}:${match[3]}`;
+    }
+    if (typeof timeValue === 'number' || timeValue instanceof Date) {
+        return new Date(timeValue).toTimeString().substr(0, 8);
+    }
+    return timeValue.toString();
+}
+
+// Styles
 const style = document.createElement('style');
 style.textContent = `
     @keyframes pulse {
@@ -425,6 +962,12 @@ style.textContent = `
     @keyframes slideIn {
         from { transform: translateX(400px); }
         to { transform: translateX(0); }
+    }
+    #range-5m:hover, #range-1h:hover, #range-1d:hover, #range-1w:hover, #range-all:hover {
+        background: rgba(255, 213, 79, 0.1) !important;
+    }
+    #panLeftBtn:hover, #panRightBtn:hover {
+        background: rgba(255,255,255,0.2) !important;
     }
 `;
 document.head.appendChild(style);
