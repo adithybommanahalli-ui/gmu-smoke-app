@@ -11,9 +11,9 @@ function login() {
   }
 }
 
-/* 🔑 ENTER KEY SUPPORT */
 document.addEventListener("keydown", function (e) {
   if (e.key === "Enter") {
     login();
   }
+
 });
