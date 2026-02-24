@@ -4,37 +4,27 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>GMU Smoke Monitoring Dashboard</title>
-
-  <!-- CSS -->
   <link rel="stylesheet" href="style.css">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#6b1f1f">
 </head>
-
 <body>
-
-<!-- 🔐 LOGIN CHECK -->
 <script>
   if (localStorage.getItem("gmu_auth") !== "true") {
     window.location.href = "login.html";
   }
 </script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-
-<!-- HEADER -->
 <header class="top-header">
   <div class="header-left">
     <a href="https://gmu.ac.in/" target="_blank">
       <img src="https://gmu.ac.in/assets/imgs/gmulogo1.png" alt="GMU Logo" class="header-logo">
     </a>
   </div>
-
   <div class="header-title">
     <h1>Smoke Monitoring System</h1>
-    <p>GM University · HOD Cabin</p>
+    <p>GM University  · HOD Cabin</p>
   </div>
-
   <div class="header-right">
     <a href="https://github.com/adithybommanahalli-ui/gmu-smoke-app" target="_blank">
       <img src="https://cdn-icons-png.flaticon.com/512/25/25231.png" alt="GitHub" class="header-icon">
@@ -45,59 +35,39 @@
     </a>
   </div>
 </header>
-
-<!-- DASHBOARD -->
 <main class="dashboard dashboard-top">
-
-  <!-- LEFT : SMOKE LEVEL -->
   <div class="card">
     <h2>Smoke Level</h2>
     <div class="value" id="smokeValue">0</div>
-
     <div class="meter">
       <div class="meter-fill" id="smokeMeter"></div>
     </div>
-
     <p class="meter-label">
-      Intensity: <span id="meterText">LOW</span>
+      Intensity: <span id="meterText">--</span>
     </p>
     <p class="last-updated" id="lastUpdated">Last updated: --</p>
   </div>
-
-
-
-  <!-- CENTER : PURE SVG (NO CARD) -->
   <div class="center-svg">
     <img src="assets/gmu-logo.svg" alt="GMU Logo" id="interactiveLogo">
   </div>
-
-  <!-- RIGHT : BUZZER CONTROL -->
   <div class="card actions">
     <h2>Buzzer Control</h2>
-
     <button id="muteBtn" onclick="muteBuzzer()" style="margin-bottom:12px;">
       Mute Buzzer
     </button>
-
     <button id="enableBtn" onclick="enableBuzzer()" style="background:#22c55e;color:white;">
       Reset / Enable Buzzer
     </button>
-    
     <p id="systemStatus" style="margin-top:15px;font-size:14px;color:#22c55e;">✅ System Online</p>
   </div>
-
  <div class="card" style="grid-column: 1 / -1;">
     <h2>Live Smoke Trend</h2>
-    <!-- Time range selector buttons -->
     <div class="chart-container" style="width: 100%; height: 280px; position: relative;">
         <canvas id="smokeChart"></canvas>
     </div>
-    <!-- Pan controls will be injected here by JS -->
 </div>
-  <!-- HISTORY TABLE -->
   <div class="card" style="grid-column:1/-1">
     <h2>Recent Events</h2>
-
     <div style="overflow-x:auto">
       <table id="historyTable" style="width:100%;margin-top:12px;border-collapse:collapse;">
         <thead>
@@ -113,17 +83,10 @@
         <tbody></tbody>
       </table>
     </div>
-  </div>
-
-  
+  </div> 
 </main>
-
 <footer class="footer">
   <div class="footer-container">
-
-    
-
-    <!-- PROJECT INFO -->
     <div class="footer-section">
       <h3>Smoke Monitoring System</h3>
       <p>
@@ -132,54 +95,39 @@
         Engineering, GM University.
       </p>
     </div>
-
    <div class="footer-section">
-
   <p><b>Project Team </b></p>
-
-  <!-- HOD -->
   <div class="person-list">
     <div class="person-row">
       <span class="person-left">HOD CSE</span>
       <span class="person-right">Dr. Shivanagowda G M</span>
     </div>
-
     <div class="person-row">
       <span class="person-left">Project Coordinator</span>
       <span class="person-right">Ms. Nanditha G</span>
     </div>
   </div>
 <div style="margin-bottom: 20px;"></div>
-
-  <!-- TEAM MEMBERS TITLE -->
   <p class="sub-heading"><b>Team Members</b></p>
-
-  <!-- STUDENTS -->
   <div class="person-list">
     <div class="person-row">
       <span class="person-left">Abhishek U S</span>
       <span class="person-right">UE24E01CS004</span>
     </div>
-
     <div class="person-row">
       <span class="person-left">Aditya B</span>
       <span class="person-right">UE24E01CS006</span>
     </div>
-
     <div class="person-row">
       <span class="person-left">Aman M K</span>
       <span class="person-right">UE24E01CS010</span>
     </div>
-
     <div class="person-row">
       <span class="person-left">Chandankumar K</span>
       <span class="person-right">UE24E01CS034</span>
     </div>
   </div>
-
 </div>
-
-    <!-- CONTACT -->
     <div class="footer-section contact-section">
       <h3>Contact</h3>
       <p>
@@ -194,17 +142,12 @@
         </a>
       </p>
     </div>
-
   </div>
-
   <div class="footer-bottom">
     © GM University · IoT Smoke Detection System
   </div>
 </footer>
-
-<!-- JS -->
 <script src="app.js"></script>
-
 <script>
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("service-worker.js")
@@ -212,6 +155,5 @@
       .catch(err => console.error("SW error:", err));
   }
 </script>
-
 </body>
 </html>
