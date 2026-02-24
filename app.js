@@ -1,8 +1,3 @@
-/*******************************************************
- * GMU SMOKE MONITORING DASHBOARD - APP.JS
- * VERSION: 6.2 - Added Pan/Zoom for Historical Data
- *******************************************************/
-
 const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw3YyF-hXbhDXkRosy0z45xUEvJViwqaT2-qBdSTj8JiBytKnCBl3EXoqkt3Xozm5g8/exec";
 const UPDATE_INTERVAL = 3000;
 
@@ -15,8 +10,6 @@ let lastData = null;
 let updateTimer = null;
 commandInProgress = false;
 let lastUpdateTime = 0;
-
-/* ================= TIME RANGE CONFIGURATION ================= */
 
 const TIME_RANGES = {
     '5m': { 
@@ -56,17 +49,16 @@ let historicalData = [];
 let liveDataBuffer = [];
 let smokeChart = null;
 let isHistoryLoaded = false;
-let isAutoScroll = true;  // Auto-scroll to latest by default
+let isAutoScroll = true; 
 
-/* ================= INITIALIZATION ================= */
 
 document.addEventListener('DOMContentLoaded', async function() {
     console.log('Dashboard starting...');
     
     initNotifications();
-    await initSmokeChart();  // Wait for chart init
+    await initSmokeChart();  
     initTimeRangeControls();
-    initPanControls();       // NEW: Pan/zoom controls
+    initPanControls();      
     
     await loadHistoricalData();
     isHistoryLoaded = true;
@@ -78,7 +70,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     document.getElementById('enableBtn')?.addEventListener('click', () => sendCommand(1));
 });
 
-/* ================= HISTORICAL DATA ================= */
+
 
 async function loadHistoricalData() {
     try {
@@ -133,7 +125,7 @@ function parseDateTime(dateStr, timeStr) {
     }
 }
 
-/* ================= LIVE DATA ================= */
+
 
 function addLiveDataPoint(timestamp, value) {
     liveDataBuffer.push({ timestamp, value: Number(value) });
@@ -146,7 +138,7 @@ function addLiveDataPoint(timestamp, value) {
     }
 }
 
-/* ================= AGGREGATION ================= */
+
 
 function getAllDataForRange(rangeKey) {
     const config = TIME_RANGES[rangeKey];
@@ -263,13 +255,13 @@ function formatTimeLabel(timestamp, rangeKey) {
     }
 }
 
-/* ================= CHART WITH PAN/ZOOM ================= */
+
 
 async function initSmokeChart() {
     const ctx = document.getElementById('smokeChart');
     if (!ctx) return;
     
-    // Load Chart.js Zoom plugin dynamically
+   
     await loadChartZoomPlugin();
     
     smokeChart = new Chart(ctx, {
@@ -311,7 +303,7 @@ async function initSmokeChart() {
                         }
                     }
                 },
-                // ZOOM PLUGIN CONFIGURATION
+               
                 zoom: {
                     pan: {
                         enabled: true,
@@ -372,7 +364,7 @@ function updateAggregatedGraph() {
     const labels = aggregated.map(p => p.label);
     const values = aggregated.map(p => p.value);
     
-    // Check if changed
+    
     if (JSON.stringify(smokeChart.data.labels) === JSON.stringify(labels) &&
         JSON.stringify(smokeChart.data.datasets[0].data) === JSON.stringify(values)) {
         return;
@@ -381,22 +373,21 @@ function updateAggregatedGraph() {
     smokeChart.data.labels = labels;
     smokeChart.data.datasets[0].data = values;
     
-    // Handle auto-scroll to latest
     if (isAutoScroll && smokeChart.options.plugins.zoom) {
-        // Reset zoom to show latest data
+       
         smokeChart.resetZoom();
     }
     
     smokeChart.update('none');
 }
 
-/* ================= PAN CONTROL BUTTONS ================= */
+
 
 function initPanControls() {
     const chartCard = document.getElementById('smokeChart')?.closest('.card');
     if (!chartCard) return;
     
-    // Create control bar below chart
+    
     const controlBar = document.createElement('div');
     controlBar.id = 'panControlBar';
     controlBar.style.cssText = `
@@ -469,13 +460,13 @@ window.panChart = function(direction) {
     const chart = smokeChart;
     const xScale = chart.scales.x;
     const range = xScale.max - xScale.min;
-    const panAmount = range * 0.2; // Pan 20% of visible range
+    const panAmount = range * 0.2;
     
     if (direction === 'left') {
-        // Pan to older data (decrease min/max)
+        
         chart.zoomScale('x', { min: xScale.min - panAmount, max: xScale.max - panAmount }, 'default');
     } else {
-        // Pan to newer data (increase min/max)
+        
         chart.zoomScale('x', { min: xScale.min + panAmount, max: xScale.max + panAmount }, 'default');
     }
 };
@@ -487,7 +478,7 @@ window.resetChartView = function() {
     updatePanButtons();
 };
 
-/* ================= TIME RANGE CONTROLS ================= */
+
 
 function initTimeRangeControls() {
     const chartCard = document.getElementById('smokeChart')?.closest('.card');
@@ -543,7 +534,7 @@ window.setTimeRange = function(rangeKey) {
     currentRange = rangeKey;
     renderRangeButtons();
     
-    // Reset view when changing time range
+   
     isAutoScroll = true;
     if (smokeChart) smokeChart.resetZoom();
     updatePanButtons();
@@ -552,7 +543,7 @@ window.setTimeRange = function(rangeKey) {
     console.log(`Switched to ${TIME_RANGES[rangeKey].label}`);
 };
 
-/* ================= DATA UPDATES ================= */
+
 
 function startDataUpdates() {
     updateData();
@@ -591,7 +582,7 @@ async function updateData() {
     }
 }
 
-/* ================= UI UPDATES (UNCHANGED) ================= */
+
 
 function updateUI(data) {
     const isOnline = data.online === true && parseInt(data.seconds_since_update) < 35;
@@ -755,7 +746,7 @@ async function sendCommand(buzzerState) {
     }
 }
 
-/* ================= NOTIFICATIONS & HISTORY ================= */
+
 
 function initNotifications() {
     if (!("Notification" in window)) {
@@ -952,7 +943,7 @@ function formatTime(timeValue) {
     return timeValue.toString();
 }
 
-// Styles
+
 const style = document.createElement('style');
 style.textContent = `
     @keyframes pulse {
@@ -971,3 +962,4 @@ style.textContent = `
     }
 `;
 document.head.appendChild(style);
+
