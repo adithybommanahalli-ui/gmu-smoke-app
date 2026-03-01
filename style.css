@@ -55,6 +55,16 @@
   --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-base: 250ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-slow: 350ms cubic-bezier(0.4, 0, 0.2, 1);
+  /* Custom Text Selection Color */
+::selection {
+  background: rgb(252, 196, 11); /* soft gold */
+  color: #824703;
+}
+
+::-moz-selection {
+  background: rgba(212,175,55,0.6);
+  color: #0f172a;
+}
 }
 
 /* ============================================
@@ -82,7 +92,7 @@ body {
 
   background-size:contain;
   background-repeat: no-repeat;
-  background-position: center;
+  background-position: center 80x;
   background-attachment: fixed;
 
   color: var(--text-primary);
@@ -1420,10 +1430,10 @@ body {
 
   background: 
   
-    url("./assets/college.jpeg");
+    url("./assets/college.png");
 
   background-size: cover;        /* fills entire screen */
-  background-position: center;
+  background-position: center 80x;
   background-repeat: no-repeat;
   background-attachment: fixed;  /* parallax */
 
