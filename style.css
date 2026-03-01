@@ -1,15 +1,15 @@
-
 @font-face {
   font-family: "GMUSans";
   src: url("./fonts/TACTICSANSEXD-BLDIT.OTF") format("opentype");
-  font-weight: normal;
+  font-weight: 400 900;
   font-style: normal;
+  font-display: swap;
 }
 
 :root {
   /* Typography */
-  --font-main: "GMUSans", "Segoe UI", system-ui, sans-serif;
-  --font-secondary: "Inter", "Helvetica Neue", system-ui, sans-serif;
+  --font-main: "GMUSans";
+  --font-secondary: "GMUSans";
   
   /* Luxury Color Palette */
   --primary: #0f172a;           /* Deep Navy */
@@ -74,12 +74,20 @@ html {
 }
 
 body {
-  font-family: var(--font-secondary);
-  background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 50%, #f8fafc 100%);
+  font-family: var(--font-main);
+
+  background:
+    
+    url("./assets/college.png");
+
+  background-size:contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-attachment: fixed;
+
   color: var(--text-primary);
   line-height: 1.6;
   min-height: 100vh;
-  cursor: url("./assets/cursor1.png") 24 24, auto !important;
 }
 
 /* ============================================
@@ -155,9 +163,9 @@ body {
 /* Logo Styling */
 .header-logo,
 .header-icon {
-  width: 48px;
-  height: 48px;
-  padding: 8px;
+  width: 54px;
+  height: 54px;
+  padding: 2px;
   border-radius: 50%;
   background: linear-gradient(135deg, #ffffff 0%, #f1f5f9 100%);
   display: flex;
@@ -171,7 +179,7 @@ body {
 .header-icon {
   width: 40px;
   height: 40px;
-  padding: 6px;
+  padding: 2px;
 }
 
 .header-logo:hover,
@@ -882,9 +890,7 @@ tbody tr:hover {
   gap: 8px;
 }
 
-.error-text::before {
-  content: '⚠';
-}
+
 
 /* ============================================
    FOOTER - Elegant Dark
@@ -1191,4 +1197,325 @@ tbody tr:hover {
   background: var(--bg-glass);
   backdrop-filter: blur(12px);
   border: 1px solid rgba(255, 255, 255, 0.3);
+}
+/* ============================================
+   STACKED LAYOUT OVERRIDES
+   Place this AFTER your existing CSS
+   ============================================ */
+
+.dashboard {
+  display: flex !important;           /* override grid */
+  flex-direction: column !important;
+  min-height: 100vh;                  /* gives room for last card to grow */
+  /* keep your existing gap and padding */
+  gap: 28px;
+  padding: 40px 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* Each card takes full width */
+.dashboard .card {
+  width: 100% !important;
+}
+
+/* Last card (Recent Events) expands to fill remaining space */
+.dashboard .card:last-child {
+  flex: 1 !important;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Make the table container inside the last card expand */
+.dashboard .card:last-child .table-container {
+  flex: 1 !important;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Allow the table itself to expand */
+.dashboard .card:last-child table {
+  flex: 1 !important;
+  width: 100%;
+}
+
+/* Responsive: keep stacking on smaller screens */
+@media (max-width: 768px) {
+  .dashboard {
+    padding: 24px 16px;
+    gap: 20px;
+  }
+}
+/* ============================================
+   FOOTER REDESIGN – Apple‑like Blur + Cards
+   ============================================ */
+
+/* Make footer background transparent with blur */
+.footer {
+  background: transparent !important;                /* remove gradient */
+  backdrop-filter: blur(20px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+  /* Keep existing border, margin, position */
+  border-top: 1px solid rgba(212, 175, 55, 0.2);
+  margin-top: 80px;
+  position: relative;
+}
+
+/* Subtle dark overlay for better text contrast */
+.footer::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(197, 202, 212, 0.3);                 /* very dark sheer layer */
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Ensure content sits above the overlay */
+.footer-container,
+.footer-bottom {
+  position: relative;
+  z-index: 1;
+}
+
+/* Style each footer section as a card */
+.footer-section {
+  background: rgba(103, 107, 117, 0.7) !important;      /* semi‑transparent dark */
+  backdrop-filter: blur(10px) !important;            /* optional inner glass */
+  -webkit-backdrop-filter: blur(10px) !important;
+  border-radius: var(--radius-lg) !important;
+  padding: 28px !important;
+  border: 1px solid rgba(212, 175, 55, 0.2) !important;
+  box-shadow: var(--shadow-md), 0 0 0 1px rgba(255,255,255,0.1) inset !important;
+  transition: all var(--transition-slow);
+  color: #ffffff;
+}
+
+/* Section headings – keep gold accent */
+.footer-section h3 {
+  color: var(--accent) !important;
+  font-family: var(--font-main);
+  font-size: 16px;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  font-weight: 600;
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  position: relative;
+}
+
+.footer-section h3::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 40px;
+  height: 2px;
+  background: var(--accent);
+}
+
+/* Description text */
+.footer-section p {
+  color: #e2e8f0 !important;
+  font-size: 14px;
+  line-height: 1.8;
+}
+
+/* Team member rows */
+.person-row {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid rgba(212, 175, 55, 0.1) !important;
+  border-radius: var(--radius-md) !important;
+  padding: 14px 18px !important;
+  color: #e2e8f0 !important;
+  transition: all var(--transition-base);
+}
+
+.person-row:hover {
+  background: rgba(212, 175, 55, 0.15) !important;
+  border-color: rgba(212, 175, 55, 0.3) !important;
+  transform: translateX(4px);
+}
+
+/* Contact details (if you use <address> or similar) */
+.footer-section address,
+.footer-section .contact-info {
+  color: #e2e8f0;
+  font-style: normal;
+  line-height: 1.8;
+}
+
+/* Links inside cards */
+.footer-section a {
+  color: var(--accent-light) !important;
+  text-decoration: none;
+  transition: color var(--transition-fast);
+}
+
+.footer-section a:hover {
+  color: var(--accent) !important;
+}
+
+/* Footer bottom stays simple but also blurred */
+.footer-bottom {
+  background: rgba(160, 153, 153, 0.3) !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+  border-top: 1px solid rgba(212, 175, 55, 0.2);
+  text-align: center;
+  padding: 24px;
+  font-size: 13px;
+  color: #2d60a8;
+}
+
+/* Responsive grid for the cards */
+@media (max-width: 1024px) {
+  .footer-container {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 40px;
+  }
+}
+
+@media (max-width: 768px) {
+  .footer-container {
+    grid-template-columns: 1fr !important;
+    gap: 30px;
+  }
+  
+  .footer-section {
+    padding: 20px !important;
+  }
+}
+/* ============================================
+   STACK FOOTER CARDS VERTICALLY
+   ============================================ */
+
+/* Make footer container a vertical stack */
+.footer-container {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 30px !important;
+  max-width: 800px;               /* optional: narrower for better readability */
+  margin-left: auto !important;
+  margin-right: auto !important;
+  width: 100%;
+}
+
+/* Each footer section (card) spans full width */
+.footer-section {
+  width: 100% !important;
+}
+
+/* Remove any leftover grid rules from earlier */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .footer-container {
+    grid-template-columns: 1fr !important; /* ensure only one column */
+  }
+}
+body {
+  font-family: var(--font-main);
+
+  background: 
+  
+    url("./assets/college.jpeg");
+
+  background-size: cover;        /* fills entire screen */
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;  /* parallax */
+
+  color: var(--text-primary);
+  line-height: 1.6;
+  min-height: 100vh;
+}
+/* ============================================
+   MOBILE FIX FOR FLOATING GLASS FOOTER
+   ============================================ */
+
+@media (max-width: 768px) {
+
+.footer {
+
+  /* Remove large margins */
+  margin: 60px 12px 12px 12px;
+
+  /* Smaller animation distance */
+  transform: translateY(80px) scale(0.95);
+
+  border-radius: 22px 22px 0 0;
+
+}
+
+
+/* Visible state */
+
+.footer.footer-visible {
+
+transform: translateY(0) scale(1);
+
+}
+
+
+/* Smaller bounce */
+
+@keyframes footerElastic {
+
+0% {
+transform: translateY(80px) scale(0.95);
+}
+
+50% {
+transform: translateY(-4px) scale(1.01);
+}
+
+75% {
+transform: translateY(2px) scale(0.99);
+}
+
+100% {
+transform: translateY(0) scale(1);
+}
+
+}
+
+}
+/* ============================================
+   STACK FOOTER CARDS VERTICALLY (Description, Team, Contact)
+   ============================================ */
+.footer-container {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 30px !important;
+  max-width: 800px;               /* narrower width for better readability */
+  margin-left: auto !important;
+  margin-right: auto !important;
+  width: 100%;
+}
+
+.footer-section {
+  width: 100% !important;
+}
+
+/* Remove any leftover grid rules from earlier */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .footer-container {
+    grid-template-columns: 1fr !important;
+  }
+}
+/* ============================================
+   MOBILE: INCREASE SPACING BETWEEN CARDS
+   ============================================ */
+@media (max-width: 768px) {
+  .dashboard {
+    gap: 32px !important;   /* was 20px – now more breathing room */
+  }
+
+  /* Optional: add a little extra padding around the dashboard edges */
+  .dashboard {
+    padding-left: 20px !important;
+    padding-right: 20px !important;
+  }
 }
