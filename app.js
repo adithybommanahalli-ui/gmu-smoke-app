@@ -856,14 +856,26 @@ async function loadHistory() {
     try {
         const response = await fetch(`${GOOGLE_SCRIPT_URL}?action=history&_=${Date.now()}`);
         const data = await response.json();
-        const last20 = data.slice(0, 20);
-        const cleanedData = deduplicateEvents(last20);
-        const tbody = document.querySelector('#historyTable tbody');
         
+        if (!Array.isArray(data) || data.length === 0) {
+            const tbody = document.querySelector('#historyTable tbody');
+            if (tbody) tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:20px;color:#000;">No events recorded</td></tr>`;
+            return;
+        }
+        
+        // Filter out heartbeats FIRST, then deduplicate, then take top 20
+        const filtered = data.filter(row => {
+            const reason = (row[7] || '').toString();
+            return reason !== 'HEARTBEAT';
+        });
+        
+        const cleanedData = deduplicateEvents(filtered).slice(0, 20);
+        
+        const tbody = document.querySelector('#historyTable tbody');
         if (!tbody) return;
         
-        if (!Array.isArray(cleanedData) || cleanedData.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding: 20px; color: #000;">No events recorded</td></tr>`;
+        if (cleanedData.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:20px;color:#000;">No events recorded</td></tr>`;
             return;
         }
         
@@ -871,9 +883,11 @@ async function loadHistory() {
             const id = (row[0] || '--').toString().slice(-6);
             const smoke = (row[1] || '0').toString();
             const status = (row[2] || '0').toString();
+            // Use formatDate safely — it already handles dd-MM-yyyy strings correctly
             const date = formatDate(row[3]);
             const time = formatTime(row[4]);
             const wifi = (row[5] || 'Unknown').toString();
+            
             const isSmoke = status === '1';
             const smokeNum = parseInt(smoke) || 0;
             const smokeColor = smokeNum > 140 ? '#CC0000' : smokeNum > 80 ? '#CC6600' : '#006600';
@@ -881,17 +895,17 @@ async function loadHistory() {
             const textColor = isSmoke ? '#990000' : '#006600';
 
             return `
-                <tr style="border-bottom: 1px solid #ddd; background: #fff;">
-                    <td style="padding: 10px; color: #000; font-family: monospace; font-size: 0.9em;">${id}</td>
-                    <td style="padding: 10px; color: ${smokeColor}; font-weight: bold;">${smoke}</td>
-                    <td style="padding: 10px;">
-                        <span style="background: ${bgColor}; color: ${textColor}; padding: 4px 8px; border-radius: 4px; font-weight: bold; border: 1px solid #999;">
+                <tr style="border-bottom:1px solid #ddd;background:#fff;">
+                    <td style="padding:10px;color:#000;font-family:monospace;font-size:0.9em;">${id}</td>
+                    <td style="padding:10px;color:${smokeColor};font-weight:bold;">${smoke}</td>
+                    <td style="padding:10px;">
+                        <span style="background:${bgColor};color:${textColor};padding:4px 8px;border-radius:4px;font-weight:bold;border:1px solid #999;">
                             ${isSmoke ? 'SMOKE' : 'CLEAR'}
                         </span>
                     </td>
-                    <td style="padding: 10px; color: #000;">${date}</td>
-                    <td style="padding: 10px; color: #000; font-family: monospace; font-weight: bold;">${time}</td>
-                    <td style="padding: 10px; color: #000;">${wifi}</td>
+                    <td style="padding:10px;color:#000;">${date}</td>
+                    <td style="padding:10px;color:#000;font-family:monospace;font-weight:bold;">${time}</td>
+                    <td style="padding:10px;color:#000;">${wifi}</td>
                 </tr>
             `;
         }).join('');
@@ -900,21 +914,39 @@ async function loadHistory() {
         console.error('History error:', error);
     }
 }
-
 function deduplicateEvents(rows) {
+    if (!rows || rows.length === 0) return [];
+    
     const result = [];
-    let lastKey = null;
+    let lastStatus = null;
+    let lastTimestamp = 0;
+    const EVENT_WINDOW_MS = 30000; // 30 seconds
+    
     for (const row of rows) {
-        const status = row[2];
-        const date = row[3];
-        const key = `${status}_${date}`;
-        if (key === lastKey) continue;
+        const status = (row[2] || '0').toString();
+        const dateStr = (row[3] || '').toString();
+        const timeStr = (row[4] || '').toString();
+        const reason = (row[7] || '').toString();
+        
+        // Always skip heartbeats from the table — they are noise
+        if (reason === 'HEARTBEAT') continue;
+        
+        // Parse timestamp for window comparison
+        const ts = parseDateTime(dateStr, timeStr) || 0;
+        
+        // Block if: same status AND within 30 seconds of last accepted row
+        const sameStatus = (status === lastStatus);
+        const withinWindow = (ts - lastTimestamp) < EVENT_WINDOW_MS;
+        
+        if (sameStatus && withinWindow) continue;
+        
         result.push(row);
-        lastKey = key;
+        lastStatus = status;
+        lastTimestamp = ts;
     }
+    
     return result;
 }
-
 function formatDate(dateValue) {
     if (!dateValue) return '--';
     if (typeof dateValue === 'string' && /^\d{2}-\d{2}-\d{4}$/.test(dateValue)) return dateValue;
