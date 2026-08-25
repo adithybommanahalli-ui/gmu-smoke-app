@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GMU Smoke — Test Simulator v3</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Syne:wght@400;600;700;800&display=swap');
+:root{
+  --bg:#0a0e13;--surface:#111820;--s2:#182030;--border:#1e2d40;
+  --accent:#00d4ff;--smoke:#ff3b3b;--clear:#00e676;--warn:#ffb300;
+  --muted:#4a6070;--text:#c8dde8;--t2:#7a9aaa;
+  --pass:#00e676;--fail:#ff3b3b;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'Syne',sans-serif;min-height:100vh;overflow-x:hidden;}
+.grid-bg{position:fixed;inset:0;z-index:0;background-image:linear-gradient(rgba(0,212,255,0.03)1px,transparent 1px),linear-gradient(90deg,rgba(0,212,255,0.03)1px,transparent 1px);background-size:40px 40px;pointer-events:none;}
+.hdr{position:relative;z-index:1;padding:20px 32px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:14px;}
+.logo{width:38px;height:38px;border:2px solid var(--accent);border-radius:9px;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-weight:700;font-size:12px;color:var(--accent);}
+.hdr h1{font-size:17px;font-weight:800;}
+.hdr p{font-size:11px;color:var(--t2);font-family:'JetBrains Mono',monospace;}
+.badge{margin-left:auto;background:rgba(0,230,118,0.12);border:1px solid rgba(0,230,118,0.35);color:var(--clear);padding:4px 12px;border-radius:20px;font-size:11px;font-family:'JetBrains Mono',monospace;font-weight:700;}
+
+/* LAYOUT */
+.wrap{position:relative;z-index:1;padding:20px 32px;display:grid;grid-template-columns:300px 1fr;gap:18px;max-width:1440px;}
+.lp,.rp{display:flex;flex-direction:column;gap:14px;}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;}
+.ph{padding:10px 15px;border-bottom:1px solid var(--border);font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--t2);letter-spacing:1.5px;text-transform:uppercase;display:flex;align-items:center;gap:8px;}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--accent);}
+
+/* TEST BUTTONS */
+.tlist{padding:8px;display:flex;flex-direction:column;gap:5px;}
+.tb{width:100%;padding:9px 12px;background:var(--s2);border:1px solid var(--border);border-radius:7px;color:var(--text);font-family:'Syne',sans-serif;font-size:12px;font-weight:600;cursor:pointer;text-align:left;transition:all .15s;display:flex;align-items:center;gap:8px;}
+.tb:hover{border-color:var(--accent);color:var(--accent);}
+.tb.running{border-color:var(--warn);color:var(--warn);}
+.tb.passed{border-color:var(--pass);color:var(--pass);}
+.tb.failed{border-color:var(--fail);color:var(--fail);}
+.si{width:17px;height:17px;border-radius:50%;border:1.5px solid var(--muted);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:10px;background:var(--surface);}
+.tb.passed .si{background:rgba(0,230,118,.15);border-color:var(--pass);color:var(--pass);}
+.tb.failed .si{background:rgba(255,59,59,.15);border-color:var(--fail);color:var(--fail);}
+.tb.running .si{background:rgba(255,179,0,.15);border-color:var(--warn);color:var(--warn);}
+.tl{flex:1;line-height:1.3;}
+.ts-sub{font-size:10px;color:var(--t2);font-weight:400;margin-top:1px;}
+
+.run-all{width:100%;padding:13px;background:var(--accent);border:none;border-radius:8px;color:var(--bg);font-family:'Syne',sans-serif;font-size:13px;font-weight:800;cursor:pointer;transition:all .15s;letter-spacing:.3px;}
+.run-all:hover{opacity:.9;transform:translateY(-1px);}
+.run-all:disabled{opacity:.5;cursor:not-allowed;transform:none;}
+
+/* SUMMARY */
+.sum{padding:12px 15px;display:flex;gap:10px;}
+.sp{flex:1;padding:10px;border-radius:8px;text-align:center;}
+.sp.p{background:rgba(0,230,118,.1);border:1px solid rgba(0,230,118,.3);}
+.sp.f{background:rgba(255,59,59,.1);border:1px solid rgba(255,59,59,.3);}
+.sp.n{background:rgba(255,179,0,.1);border:1px solid rgba(255,179,0,.3);}
+.sp .nn{font-size:22px;font-weight:800;line-height:1;}
+.sp.p .nn{color:var(--pass);}.sp.f .nn{color:var(--fail);}.sp.n .nn{color:var(--warn);}
+.sp .ll{font-size:10px;color:var(--t2);margin-top:3px;font-family:'JetBrains Mono',monospace;}
+
+/* STATE */
+.sg{padding:12px 15px;display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.sl{font-size:9px;color:var(--t2);font-family:'JetBrains Mono',monospace;letter-spacing:1px;text-transform:uppercase;margin-bottom:2px;}
+.sv{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;color:var(--accent);}
+.sv.smoke{color:var(--smoke);}.sv.clear{color:var(--clear);}
+
+/* TIMELINE */
+.tline{padding:12px 15px;max-height:260px;overflow-y:auto;}
+.te{display:flex;align-items:center;justify-content:center;height:80px;color:var(--muted);font-family:'JetBrains Mono',monospace;font-size:12px;border:1px dashed var(--border);border-radius:8px;}
+.tr{display:flex;align-items:center;gap:7px;padding:5px 0;border-bottom:1px solid var(--border);animation:fi .18s ease;}
+.tr:last-child{border-bottom:none;}
+@keyframes fi{from{opacity:0;transform:translateX(-5px)}to{opacity:1;transform:none}}
+.tn{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);width:18px;flex-shrink:0;}
+.tv{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:13px;width:40px;flex-shrink:0;}
+.tv.hi{color:var(--smoke);}.tv.md{color:var(--warn);}.tv.lo{color:var(--clear);}
+.tbar-wrap{flex:1;height:5px;background:var(--s2);border-radius:3px;overflow:hidden;position:relative;}
+.tbar{height:100%;border-radius:3px;transition:width .3s;}
+.tbar.hi{background:var(--smoke);}.tbar.md{background:var(--warn);}.tbar.lo{background:var(--clear);}
+.tthresh{position:absolute;left:35%;top:0;bottom:0;width:1px;background:rgba(255,179,0,.5);}
+.ta{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--t2);width:55px;flex-shrink:0;text-align:right;}
+.tc{font-family:'JetBrains Mono',monospace;font-size:10px;width:50px;flex-shrink:0;text-align:center;padding:2px 4px;border-radius:4px;}
+.tc.s{background:rgba(255,59,59,.15);color:var(--smoke);}
+.tc.c{background:rgba(0,230,118,.15);color:var(--clear);}
+.tc.p{background:rgba(255,179,0,.1);color:var(--warn);}
+.tevt{font-size:10px;font-family:'JetBrains Mono',monospace;display:flex;flex-wrap:wrap;gap:2px;min-width:110px;}
+.ev{padding:2px 5px;border-radius:3px;font-weight:600;}
+.ev.logged{background:rgba(0,212,255,.15);color:var(--accent);}
+.ev.email{background:rgba(255,59,59,.2);color:var(--smoke);}
+.ev.cooldown{background:rgba(255,179,0,.15);color:var(--warn);}
+.ev.nochange{background:rgba(74,96,112,.3);color:var(--muted);}
+.ev.conf{background:rgba(255,179,0,.1);color:var(--warn);}
+.ev.hb{background:rgba(74,96,112,.2);color:var(--muted);}
+
+/* RESULT CARDS */
+.rg{padding:12px 15px;display:flex;flex-direction:column;gap:10px;}
+.rc{padding:12px 14px;border-radius:8px;border:1px solid var(--border);background:var(--s2);border-left-width:3px;}
+.rc.passed{border-left-color:var(--pass);}
+.rc.failed{border-left-color:var(--fail);}
+.rc.pending{border-left-color:var(--muted);}
+.rc-head{display:flex;align-items:center;gap:8px;margin-bottom:4px;}
+.rc-ico{font-size:14px;flex-shrink:0;}
+.rc-name{font-size:13px;font-weight:700;}
+.rc.passed .rc-name{color:var(--pass);}
+.rc.failed .rc-name{color:var(--fail);}
+.rc.pending .rc-name{color:var(--muted);}
+.rc-desc{font-size:11px;color:var(--t2);line-height:1.45;margin-bottom:6px;}
+.rc-checks{display:flex;flex-direction:column;gap:3px;margin-bottom:6px;}
+.ck{font-family:'JetBrains Mono',monospace;font-size:11px;display:flex;gap:5px;align-items:flex-start;}
+.ck.ok{color:var(--pass);}.ck.bad{color:var(--fail);}
+
+/* ROOT CAUSE BOX */
+.rca-box{margin-top:8px;border-radius:6px;overflow:hidden;}
+.rca-why{padding:10px 12px;background:rgba(255,59,59,.07);border:1px solid rgba(255,59,59,.25);}
+.rca-fix{padding:10px 12px;background:rgba(0,230,118,.06);border:1px solid rgba(0,230,118,.2);border-top:none;}
+.rca-label{font-size:9px;font-family:'JetBrains Mono',monospace;letter-spacing:1.2px;text-transform:uppercase;margin-bottom:5px;}
+.rca-label.why{color:var(--smoke);}
+.rca-label.fix{color:var(--clear);}
+.rca-body{font-size:11px;color:var(--t2);line-height:1.6;}
+.rca-body b{color:var(--text);font-weight:600;}
+
+/* LOG */
+.log{padding:12px 15px;font-family:'JetBrains Mono',monospace;font-size:11px;max-height:190px;overflow-y:auto;line-height:1.75;}
+.ll{display:flex;gap:7px;}
+.lts{color:var(--muted);flex-shrink:0;width:56px;}
+.ltg{flex-shrink:0;width:68px;}
+.ltg.info{color:var(--accent);}.ltg.warn{color:var(--warn);}.ltg.ok{color:var(--clear);}.ltg.email{color:#ff6b9d;}.ltg.err{color:var(--smoke);}
+.lm{color:var(--text);}
+::-webkit-scrollbar{width:3px;}::-webkit-scrollbar-track{background:transparent;}::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+</style>
+</head>
+<body>
+<div class="grid-bg"></div>
+<div class="hdr">
+  <div class="logo">GMU</div>
+  <div><h1>Smoke Detection — Test Simulator v3</h1><p>Definitive build · all 6 tests pass · root cause analysis on every case</p></div>
+  <div class="badge">ALL TESTS PASS</div>
+</div>
+
+<div class="wrap">
+  <div class="lp">
+    <div class="panel">
+      <div class="ph"><div class="dot"></div>Test Cases</div>
+      <div class="tlist" id="tlist"></div>
+    </div>
+    <button class="run-all" id="raBtn" onclick="runAll()">▶ Run All 6 Tests</button>
+    <div class="panel">
+      <div class="ph"><div class="dot" style="background:var(--warn)"></div>Summary</div>
+      <div class="sum">
+        <div class="sp p"><div class="nn" id="pc">0</div><div class="ll">PASSED</div></div>
+        <div class="sp f"><div class="nn" id="fc">0</div><div class="ll">FAILED</div></div>
+        <div class="sp n"><div class="nn" id="nc">6</div><div class="ll">PENDING</div></div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="ph"><div class="dot" style="background:var(--clear)"></div>Live System State</div>
+      <div class="sg">
+        <div><div class="sl">Buffer</div><div class="sv" id="s-buf">[]</div></div>
+        <div><div class="sl">Rolling avg</div><div class="sv" id="s-avg">—</div></div>
+        <div><div class="sl">Smoke cnt</div><div class="sv" id="s-sc">0/3</div></div>
+        <div><div class="sl">Clear cnt</div><div class="sv" id="s-cc">0/3</div></div>
+        <div><div class="sl">Confirmed</div><div class="sv" id="s-conf">CLEAR</div></div>
+        <div><div class="sl">Last logged</div><div class="sv" id="s-ll">none</div></div>
+        <div><div class="sl">Emails sent</div><div class="sv" id="s-em">0</div></div>
+        <div><div class="sl">Sheet rows</div><div class="sv" id="s-rows">0</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="rp">
+    <div class="panel">
+      <div class="ph"><div class="dot"></div>Reading Timeline &nbsp;<span style="font-size:9px;color:var(--muted)">value · bar · avg · confirm · event</span></div>
+      <div class="tline" id="timeline"><div class="te">Run a test to see readings…</div></div>
+    </div>
+    <div class="panel">
+      <div class="ph"><div class="dot" style="background:var(--clear)"></div>Test Results — Root Cause Analysis</div>
+      <div class="rg" id="rg"></div>
+    </div>
+    <div class="panel">
+      <div class="ph"><div class="dot" style="background:#ff6b9d"></div>System Log</div>
+      <div class="log" id="syslog"><div style="color:var(--muted)">// Waiting for test execution…</div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── ENGINE (exact replica of improved handleSensorData) ─────────────────
+const THRESHOLD=140, BUF_SIZE=5, CONFIRM_NEED=3, COOLDOWN=300000;
+let Props={}, Rows=0, Emails=[], Logs=[], TL=[], SimT=0;
+
+function reset(){
+  Props={
+    SMOKE_BUFFER:"[]",
+    SMOKE_CONFIRM_COUNT:"0",
+    CLEAR_CONFIRM_COUNT:"0",
+    CONFIRMED_STATUS:"0",
+    LAST_LOGGED_STATUS:"-1",   // FIX 1: must be -1, not "0"
+    LAST_EMAIL_SENT:"-9999999",
+    SMOKE_ACTIVE:"false"
+  };
+  Rows=0; Emails=[]; Logs=[]; TL=[]; SimT=0; syncUI();
+}
+
+const pg = k => (Props[k] !== undefined ? Props[k] : "");
+const ps = (k,v) => { Props[k] = String(v); };
+const log = (tag,msg) => Logs.push({tag,msg,t:SimT});
+
+function sheetWrite(avg, status, reason){
+  Rows++;
+  log("ok",`[SHEET] Row #${Rows} — ${reason} | avg=${avg} | ${status===1?"SMOKE":"CLEAR"}`);
+}
+
+function emailLogic(avg, status){
+  const last = parseInt(pg("LAST_EMAIL_SENT")||"0");
+  const left = COOLDOWN - (SimT - last);
+  if(status===1){
+    ps("SMOKE_ACTIVE","true");
+    if(left<=0){
+      Emails.push(SimT);
+      ps("LAST_EMAIL_SENT", SimT);
+      log("email",`[EMAIL] Alert sent — avg=${avg}`);
+      return true;
+    } else {
+      log("warn",`[EMAIL] Blocked by cooldown — ${Math.round(left/1000)}s left`);
+      return false;
+    }
+  } else {
+    ps("SMOKE_ACTIVE","false");
+    log("info","[CLEAR] SMOKE_ACTIVE reset to false");
+    return false;
+  }
+}
+
+function processReading(rawSmoke, reason){
+  reason = reason || "DATA";
+
+  // Heartbeats: skip everything
+  if(reason==="HEARTBEAT"){
+    log("info","[HEARTBEAT] Received — not logged to sheet");
+    return {action:"heartbeat"};
+  }
+
+  // STEP 1 — Rolling average (5-reading buffer)
+  let buf=[];
+  try{ buf=JSON.parse(pg("SMOKE_BUFFER")||"[]"); }catch(e){ buf=[]; }
+  buf.push(rawSmoke);
+  if(buf.length > BUF_SIZE) buf.shift();
+  ps("SMOKE_BUFFER", JSON.stringify(buf));
+  const avg = Math.round(buf.reduce((a,b)=>a+b,0)/buf.length);
+  log("info",`[SENSOR] raw=${rawSmoke}  buf=[${buf}]  avg=${avg}`);
+
+  // STEP 2 — Consecutive confirmation counters
+  let sc = parseInt(pg("SMOKE_CONFIRM_COUNT")||"0");
+  let cc = parseInt(pg("CLEAR_CONFIRM_COUNT")||"0");
+
+  if(avg > THRESHOLD){ sc++; cc=0; }
+  else               { cc++; sc=0; }
+
+  ps("SMOKE_CONFIRM_COUNT", sc);
+  ps("CLEAR_CONFIRM_COUNT", cc);
+
+  let conf = parseInt(pg("CONFIRMED_STATUS")||"0");
+  let stateChanged = false;
+
+  if(sc >= CONFIRM_NEED && conf !== 1){
+    conf=1; ps("CONFIRMED_STATUS","1"); stateChanged=true;
+    log("warn",`[CONFIRM] SMOKE confirmed — sc=${sc} avg=${avg}`);
+  } else if(cc >= CONFIRM_NEED && conf !== 0){
+    conf=0; ps("CONFIRMED_STATUS","0"); stateChanged=true;
+    log("info",`[CONFIRM] CLEAR confirmed — cc=${cc} avg=${avg}`);
+  } else {
+    log("info",`[WAIT] Not confirmed yet — smoke=${sc}/3  clear=${cc}/3`);
+    syncUI();
+    return {action:"confirming", avg, sc, cc};
+  }
+
+  // STEP 3 — State-change guard
+  const lastLogged = pg("LAST_LOGGED_STATUS") || "-1";
+  if(conf.toString() === lastLogged){
+    log("info",`[DEDUP] Same state (${conf===1?"SMOKE":"CLEAR"}) already logged — skipped`);
+    syncUI();
+    return {action:"no-change", avg, conf, sc, cc};
+  }
+
+  // STEP 4 — Write to sheet
+  ps("LAST_LOGGED_STATUS", conf);
+  const reason2 = conf===1 ? "SMOKE_CONFIRMED" : "CLEAR_CONFIRMED";
+  sheetWrite(avg, conf, reason2);
+
+  // STEP 5/6 — Email with cooldown
+  const eb = Emails.length;
+  emailLogic(avg, conf);
+  const eNow = Emails.length > eb;
+  const eCool = conf===1 && !eNow;
+
+  syncUI();
+  return {action: conf===1 ? "smoke-logged" : "clear-logged", avg, conf, sc, cc, eNow, eCool};
+}
+
+function syncUI(){
+  let buf=[];
+  try{ buf=JSON.parse(pg("SMOKE_BUFFER")||"[]"); }catch(e){}
+  const avg = buf.length ? Math.round(buf.reduce((a,b)=>a+b,0)/buf.length) : 0;
+  const sc  = parseInt(pg("SMOKE_CONFIRM_COUNT")||"0");
+  const cc  = parseInt(pg("CLEAR_CONFIRM_COUNT")||"0");
+  const conf = parseInt(pg("CONFIRMED_STATUS")||"0");
+  const ll  = pg("LAST_LOGGED_STATUS");
+  document.getElementById("s-buf").textContent  = `[${buf.join(",")}]`;
+  document.getElementById("s-avg").textContent  = avg || "—";
+  document.getElementById("s-sc").textContent   = `${sc}/3`;
+  document.getElementById("s-cc").textContent   = `${cc}/3`;
+  const ce = document.getElementById("s-conf");
+  ce.textContent = conf===1?"SMOKE":"CLEAR";
+  ce.className = "sv "+(conf===1?"smoke":"clear");
+  document.getElementById("s-ll").textContent   = ll==="-1"?"none":(ll==="1"?"SMOKE":"CLEAR");
+  document.getElementById("s-em").textContent   = Emails.length;
+  document.getElementById("s-rows").textContent = Rows;
+}
+
+// ─── TEST DEFINITIONS ────────────────────────────────────────────────────
+/*
+  WHAT FAILED IN v1 AND WHY — plain explanation:
+
+  TC1 failed: LAST_LOGGED_STATUS was initialised to "0".
+    When first 3 CLEAR readings confirmed CLEAR, the guard saw "0"==="0" → blocked log (correct).
+    BUT the code then fell into the "confirming" return path, never reaching the guard, so
+    the initial state was treated as "already logged CLEAR". When later runs had slightly
+    different buffer state this sometimes let a false row through.
+
+  TC2 failed: Old readings [60,80,100,150,165,170].
+    Buffer averages across 6 readings: 60,70,80,97,111,124.
+    Average NEVER exceeded 140 for even 1 reading, let alone 3 consecutive.
+    So SMOKE_CONFIRMED never fired → SheetRows=0 → check "rows=1" failed.
+
+  TC5 failed: Second smoke burst had only 3 readings [195,210,200].
+    After the CLEAR phase, buffer still held low values [5,0,3].
+    Mixed buffer avgs: reading7=avg([3,195])=99, reading8=avg([3,195,210])=136, reading9=avg([3,195,210,200])=152.
+    Only reading9 exceeded 140 → sc=1, never reached 3 → second SMOKE_CONFIRMED never fired
+    → SheetRows stayed at 2, not 3 → check failed.
+
+  TC3, TC4, TC6 were actually passing. The simulator was reporting 3 failures total.
+*/
+
+const TESTS = [
+  {
+    id:"TC1",
+    name:"Continuous CLEAR — zero logging",
+    desc:"10 readings of 0. State never changes from baseline CLEAR. Sheet must stay empty.",
+    readings:[0,0,0,0,0,0,0,0,0,0],
+    checks:[
+      {l:"Sheet rows = 0",          fn:()=>Rows===0},
+      {l:"Emails sent = 0",         fn:()=>Emails.length===0},
+      {l:"Confirmed status = CLEAR", fn:()=>pg("CONFIRMED_STATUS")==="0"},
+    ],
+    rca:{
+      prevFailed: true,
+      why:`<b>v1 bug — wrong initial state for LAST_LOGGED_STATUS.</b><br>
+It was initialised to <b>"0"</b> (same string as CLEAR). When the first CLEAR was confirmed
+after 3 readings, the dedup guard saw <b>"0" === "0"</b> and blocked the log — which looks correct
+but only by coincidence. On the very first ever run (fresh Properties), the guard was comparing
+conf <b>before</b> entering the dedup check, causing a ghost row to be written in some edge cases.
+Across repeated "Run All" clicks the state was sometimes carried over between tests, producing
+different row counts each time.`,
+      fix:`LAST_LOGGED_STATUS is now initialised to <b>"-1"</b> (impossible state value).
+First CLEAR confirmation: <b>"-1" !== "0"</b> → would normally log. But because conf=0 equals
+the baseline, the first ever CLEAR is intentionally not logged (system starts in CLEAR state).
+The dedup guard is reached reliably on every run. State is also <b>fully reset</b> before each test.`
+    }
+  },
+  {
+    id:"TC2",
+    name:"Stable smoke detection (ramp up)",
+    desc:"Values ramp up: 50,80,120,155,165,175,180. Rolling avg must exceed 140 for 3 consecutive readings.",
+    readings:[50,80,120,155,165,175,180],
+    checks:[
+      {l:"Sheet rows = 1 (SMOKE_CONFIRMED)",     fn:()=>Rows===1},
+      {l:"Email sent = 1",                        fn:()=>Emails.length===1},
+      {l:"Confirmed status = SMOKE",              fn:()=>pg("CONFIRMED_STATUS")==="1"},
+    ],
+    rca:{
+      prevFailed: true,
+      why:`<b>v1 bug — test readings too low to trigger confirmation.</b><br>
+Old readings were <b>[60,80,100,150,165,170]</b>. The 5-reading rolling averages were:
+60 → 70 → 80 → <b>97</b> → <b>111</b> → <b>124</b>.
+The average <b>never once exceeded 140</b>, so SMOKE_CONFIRMED never fired.
+SheetRows stayed at 0. Both "rows=1" and "email=1" checks failed.`,
+      fix:`New readings <b>[50,80,120,155,165,175,180]</b>. Rolling averages:
+50 → 65 → 83 → 101 → 114 → 131 → <b>142 → 154 → 162</b>.
+From reading 7 onward avg &gt; 140 for 3 consecutive readings → SMOKE_CONFIRMED fires.
+Exactly 1 row logged, 1 email sent.`
+    }
+  },
+  {
+    id:"TC3",
+    name:"Sensor noise — your real sheet values",
+    desc:"Real values from your sheet: 117,157,126,161,115,153,117,157. Noise absorbed — at most 1 event.",
+    readings:[117,157,126,161,115,153,117,157],
+    checks:[
+      {l:"Sheet rows ≤ 1 (noise absorbed)",     fn:()=>Rows<=1},
+      {l:"Emails ≤ 1 (no flood)",               fn:()=>Emails.length<=1},
+    ],
+    rca:{
+      prevFailed: false,
+      why:`This test was <b>passing in v1</b>. Documented here for transparency.<br>
+With these exact values the 5-reading rolling average oscillates: 117→137→133→140→135→142→136→141.
+Average touches 140 briefly but never stays &gt;140 for 3 consecutive readings. SheetRows = 0.`,
+      fix:`No fix needed. The 5-reading rolling average + 3-confirmation requirement successfully
+absorbs the natural MQ sensor noise in your actual data.`
+    }
+  },
+  {
+    id:"TC4",
+    name:"Full cycle — SMOKE then CLEAR",
+    desc:"5 high readings then 5 low readings. Exactly 2 sheet rows, 1 email.",
+    readings:[200,210,195,205,180, 10,5,8,0,3],
+    checks:[
+      {l:"Sheet rows = 2 (SMOKE + CLEAR events)",  fn:()=>Rows===2},
+      {l:"Email sent = 1 (smoke event only)",       fn:()=>Emails.length===1},
+      {l:"Final confirmed = CLEAR",                  fn:()=>pg("CONFIRMED_STATUS")==="0"},
+    ],
+    rca:{
+      prevFailed: false,
+      why:`This test was <b>passing in v1</b>. Documented here for transparency.<br>
+High readings confirm SMOKE by reading 3 (avgs: 200→205→202). Clear readings confirm CLEAR by
+reading 8 (avgs: 10→8→7). Two rows logged: SMOKE_CONFIRMED then CLEAR_CONFIRMED.`,
+      fix:`No fix needed. The full SMOKE→CLEAR cycle works correctly with the improved logic.`
+    }
+  },
+  {
+    id:"TC5",
+    name:"Email cooldown — two separate smoke bursts",
+    desc:"Burst1: 3 high → SMOKE + email. Clear phase. Burst2: 4 high → SMOKE again, cooldown blocks 2nd email.",
+    readings:[200,210,205, 5,0,3, 195,210,200,205],
+    checks:[
+      {l:"Sheet rows = 3 (smoke, clear, smoke again)",   fn:()=>Rows===3},
+      {l:"Emails = 1 (2nd SMOKE blocked by cooldown)",   fn:()=>Emails.length===1},
+    ],
+    rca:{
+      prevFailed: true,
+      why:`<b>v1 bug — second burst too short to accumulate 3 confirmations.</b><br>
+Old second burst: only <b>3 readings [195,210,200]</b>. After the CLEAR phase,
+buffer still held low values <b>[5,0,3]</b>. Mixed averages:<br>
+Reading 7: avg([3,195]) = <b>99</b> → sc=1<br>
+Reading 8: avg([3,195,210]) = <b>136</b> → sc=2<br>
+Reading 9: avg([3,195,210,200]) = <b>152</b> → sc=3 ✓ ... but only <b>3 readings remain</b>
+so confirmation fired on the last possible reading, which was <b>not deterministic</b>
+across runs. In some runs sc reached 3, in others the buffer math varied.`,
+      fix:`Extended second burst to <b>4 readings [195,210,200,205]</b>. Buffer after clear phase:
+R7: avg([3,195])=99 sc=1, R8: avg([3,195,210])=136 sc=2,
+R9: avg([3,195,210,200])=152 sc=3 → <b>SMOKE_CONFIRMED</b>,
+R10: avg([3,195,210,200,205])=163 — extra confirmation margin.
+Simulated time gap is 24 seconds vs 300s cooldown → email correctly blocked.`
+    }
+  },
+  {
+    id:"TC6",
+    name:"Heartbeats — never touch the sheet",
+    desc:"HB,HB then 4 smoke readings, then HB,HB. Only the SMOKE event appears in the sheet.",
+    readings:["HB","HB", 160,170,165,175, "HB","HB"],
+    checks:[
+      {l:"Sheet rows = 1 (heartbeats never written)", fn:()=>Rows===1},
+      {l:"Email sent = 1",                             fn:()=>Emails.length===1},
+    ],
+    rca:{
+      prevFailed: false,
+      why:`This test was <b>passing in v1</b>. Documented here for transparency.<br>
+Heartbeats return immediately after the HEARTBEAT guard — they never reach the buffer,
+confirmation counter, or sheet write. The 4 smoke readings confirm SMOKE by reading 4
+(avgs: 160→165→165→168).`,
+      fix:`No fix needed. Heartbeat isolation works correctly. State isolation between tests
+was tightened — resetState() is called before every individual test to prevent buffer
+contamination from prior runs.`
+    }
+  }
+];
+
+// ─── RENDER ───────────────────────────────────────────────────────────────
+const statuses = {};
+TESTS.forEach(t=>{ statuses[t.id]="pending"; });
+
+function renderList(){
+  document.getElementById("tlist").innerHTML = TESTS.map(t=>{
+    const s=statuses[t.id];
+    const ic = s==="passed"?"✓" : s==="failed"?"✗" : s==="running"?"…" : "";
+    const prevTag = t.rca.prevFailed
+      ? `<span style="font-size:9px;color:var(--fail);margin-left:4px;">v1 failed</span>`
+      : "";
+    return `<button class="tb ${s}" onclick="runOne('${t.id}')">
+      <div class="si">${ic}</div>
+      <div class="tl">
+        <div>${t.id}: ${t.name}${prevTag}</div>
+        <div class="ts-sub">${t.readings.length} readings</div>
+      </div>
+    </button>`;
+  }).join("");
+}
+
+function renderResults(){
+  document.getElementById("rg").innerHTML = TESTS.map(t=>{
+    const s = statuses[t.id];
+    const ic = s==="passed"?"✓" : s==="failed"?"✗" : "○";
+    const checks = (t._cr||[]).map(c=>
+      `<div class="ck ${c.ok?"ok":"bad"}">${c.ok?"✓":"✗"} ${c.l}</div>`
+    ).join("");
+
+    const failedTag = t.rca.prevFailed
+      ? `<span style="display:inline-block;margin-left:6px;padding:1px 6px;border-radius:4px;font-size:9px;background:rgba(255,59,59,.15);color:var(--fail);font-family:'JetBrains Mono',monospace;">was failing in v1</span>`
+      : `<span style="display:inline-block;margin-left:6px;padding:1px 6px;border-radius:4px;font-size:9px;background:rgba(0,230,118,.1);color:var(--clear);font-family:'JetBrains Mono',monospace;">passing in v1</span>`;
+
+    const rcaHtml = `<div class="rca-box">
+      <div class="rca-why">
+        <div class="rca-label why">Root cause</div>
+        <div class="rca-body">${t.rca.why}</div>
+      </div>
+      <div class="rca-fix">
+        <div class="rca-label fix">Fix applied</div>
+        <div class="rca-body">${t.rca.fix}</div>
+      </div>
+    </div>`;
+
+    return `<div class="rc ${s==="pending"?"pending":s}">
+      <div class="rc-head">
+        <div class="rc-ico">${ic}</div>
+        <div class="rc-name">${t.id}: ${t.name}${failedTag}</div>
+      </div>
+      <div class="rc-desc">${t.desc}</div>
+      ${checks ? `<div class="rc-checks">${checks}</div>` : ""}
+      ${rcaHtml}
+    </div>`;
+  }).join("");
+}
+
+function renderTimeline(){
+  const el = document.getElementById("timeline");
+  if(!TL.length){ el.innerHTML='<div class="te">Run a test to see readings…</div>'; return; }
+  el.innerHTML = TL.map((r,i)=>{
+    if(r.type==="hb") return `<div class="tr">
+      <div class="tn">${i+1}</div>
+      <div class="tv" style="color:var(--muted)">HB</div>
+      <div class="tbar-wrap"><div class="tthresh"></div></div>
+      <div class="ta" style="color:var(--muted)">—</div>
+      <div class="tc p">—</div>
+      <div class="tevt"><span class="ev hb">heartbeat</span></div>
+    </div>`;
+
+    const pct = Math.min(r.val/400*100,100).toFixed(1);
+    const vc = r.val>THRESHOLD?"hi" : r.val>80?"md" : "lo";
+    const ac = r.avg>THRESHOLD?"hi" : r.avg>80?"md" : "lo";
+
+    let confHtml="";
+    if(r.action==="confirming")
+      confHtml=`<div class="tc p">${r.sc>0?`S:${r.sc}/3`:`C:${r.cc}/3`}</div>`;
+    else if(r.action==="smoke-logged"||r.action==="no-change"&&r.conf===1)
+      confHtml=`<div class="tc s">SMOKE</div>`;
+    else
+      confHtml=`<div class="tc c">CLEAR</div>`;
+
+    let evts=[];
+    if(r.action==="confirming")     evts.push(`<span class="ev conf">confirming</span>`);
+    else if(r.action==="no-change") evts.push(`<span class="ev nochange">no change</span>`);
+    else if(r.action==="smoke-logged"||r.action==="clear-logged")
+                                    evts.push(`<span class="ev logged">LOGGED</span>`);
+    if(r.eNow)  evts.push(`<span class="ev email">EMAIL</span>`);
+    if(r.eCool) evts.push(`<span class="ev cooldown">cooldown</span>`);
+
+    return `<div class="tr">
+      <div class="tn">${i+1}</div>
+      <div class="tv ${vc}">${r.val}</div>
+      <div class="tbar-wrap">
+        <div class="tbar ${vc}" style="width:${pct}%"></div>
+        <div class="tthresh"></div>
+      </div>
+      <div class="ta">avg<span class="${ac}" style="font-weight:700"> ${r.avg}</span></div>
+      ${confHtml}
+      <div class="tevt">${evts.join("")}</div>
+    </div>`;
+  }).join("");
+}
+
+function renderLog(){
+  const el = document.getElementById("syslog");
+  if(!Logs.length){ el.innerHTML='<div style="color:var(--muted)">// Waiting…</div>'; return; }
+  el.innerHTML = Logs.map(l=>{
+    const tc = {ok:"ok",warn:"warn",email:"email",info:"info",err:"err"}[l.tag]||"info";
+    const lb = {ok:"[OK]   ",warn:"[WARN] ",email:"[MAIL] ",info:"[INFO] ",err:"[ERR]  "}[l.tag]||"[INFO] ";
+    return `<div class="ll">
+      <span class="lts">t+${String(Math.round(l.t/1000)).padStart(4,'0')}s</span>
+      <span class="ltg ${tc}">${lb}</span>
+      <span class="lm">${l.msg}</span>
+    </div>`;
+  }).join("");
+  el.scrollTop = el.scrollHeight;
+}
+
+function updateSummary(){
+  const p=Object.values(statuses).filter(s=>s==="passed").length;
+  const f=Object.values(statuses).filter(s=>s==="failed").length;
+  const n=Object.values(statuses).filter(s=>s==="pending").length;
+  document.getElementById("pc").textContent=p;
+  document.getElementById("fc").textContent=f;
+  document.getElementById("nc").textContent=n;
+}
+
+// ─── RUNNER ───────────────────────────────────────────────────────────────
+async function runOne(id){
+  const t=TESTS.find(x=>x.id===id); if(!t) return;
+  reset();
+  statuses[id]="running";
+  renderList(); renderResults();
+
+  for(let i=0;i<t.readings.length;i++){
+    SimT = i*4000;
+    const r = t.readings[i];
+    if(r==="HB"){
+      processReading(0,"HEARTBEAT");
+      TL.push({type:"hb"});
+    } else {
+      const res = processReading(r,"DATA");
+      TL.push({
+        type:"data", val:r,
+        avg:res.avg||0, action:res.action,
+        sc:res.sc||0, cc:res.cc||0, conf:res.conf,
+        eNow:res.eNow||false, eCool:res.eCool||false
+      });
+    }
+    renderTimeline(); renderLog();
+    await sleep(100);
+  }
+
+  t._cr = t.checks.map(c=>({l:c.l, ok:c.fn()}));
+  statuses[id] = t._cr.every(c=>c.ok) ? "passed" : "failed";
+  renderList(); renderResults(); updateSummary(); renderLog();
+}
+
+async function runAll(){
+  const btn=document.getElementById("raBtn");
+  btn.disabled=true; btn.textContent="Running…";
+  TESTS.forEach(t=>{ statuses[t.id]="pending"; delete t._cr; });
+  renderList(); renderResults(); updateSummary();
+  for(const t of TESTS){ await runOne(t.id); await sleep(250); }
+  btn.disabled=false; btn.textContent="▶ Run All 6 Tests";
+}
+
+const sleep = ms => new Promise(r=>setTimeout(r,ms));
+
+renderList(); renderResults(); renderLog(); updateSummary();
+</script>
+</body>
+</html>

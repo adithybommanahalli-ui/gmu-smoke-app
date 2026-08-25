@@ -1,0 +1,10 @@
+node_modules/
+jdk21/
+.idea/
+*.apk
+*.aab
+android/.gradle/
+android/build/
+android/app/build/
+android/capacitor-cordova-android-plugins/build/
+android/local.properties

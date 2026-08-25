@@ -1,0 +1,488 @@
+/* ================= GMU SMOKE DETECTION SYSTEM ================= */
+/* ================= GOOGLE APPS SCRIPT BACKEND ================= */
+
+function doGet(e) {
+  try {
+    // Get parameters
+    const params = e?.parameter || {};
+    const action = params.action || "";
+    
+    // Route to appropriate handler
+    switch(action) {
+      case "latest":
+        return handleLatestRequest();
+      case "history":
+        return handleHistoryRequest();
+      case "getCommand":
+        return handleGetCommand();
+      case "command":
+        return handleCommand(params.buzzer || "1", params.source || "dashboard");
+      case "health":
+        return handleHealthCheck();
+      case "test":
+        return handleTestRequest();
+      default:
+        // If smoke_value exists, it's from ESP8266
+        if (params.smoke_value !== undefined) {
+          return handleSensorData(params);
+        }
+        return createTextResponse("GMU Smoke System v2.0");
+    }
+    
+  } catch (error) {
+    console.error("Error in doGet:", error);
+    return createErrorResponse(error.message);
+  }
+}
+
+function doPost(e) {
+  return doGet(e);
+}
+
+/* ================= HANDLE SENSOR DATA FROM ESP8266 ================= */
+function handleSensorData(params) {
+  try {
+    console.log("📡 Receiving sensor data from ESP8266");
+    
+    // Parse data
+    const smoke = parseInt(params.smoke_value) || 0;
+    const status = parseInt(params.status) || 0;
+    const wifi = params.wifi || "Unknown";
+    const now = new Date();
+    
+    // Format date/time for India timezone
+    const dateStr = Utilities.formatDate(now, "Asia/Kolkata", "dd-MM-yyyy");
+    const timeStr = Utilities.formatDate(now, "Asia/Kolkata", "HH:mm:ss");
+    
+    console.log(`Data: Smoke=${smoke}, Status=${status}, WiFi=${wifi}`);
+    
+    // Get properties
+    const props = PropertiesService.getScriptProperties();
+    
+    // Update latest values
+    props.setProperties({
+      "LATEST_SMOKE": smoke.toString(),
+      "LATEST_STATUS": status.toString(),
+      "LATEST_DATE": dateStr,
+      "LATEST_TIME": timeStr,
+      "LAST_UPDATE": now.getTime().toString()
+    });
+    
+    // Handle smoke alerts
+    handleSmokeAlert(smoke, status, props);
+    
+    // Log to spreadsheet
+    logToSheet(smoke, status, dateStr, timeStr, wifi);
+    
+    return createTextResponse("OK");
+    
+  } catch (error) {
+    console.error("Error in handleSensorData:", error);
+    return createTextResponse("ERROR");
+  }
+}
+
+/* ================= HANDLE LATEST DATA REQUEST ================= */
+function handleLatestRequest() {
+  try {
+    const props = PropertiesService.getScriptProperties();
+    
+    const response = {
+      smoke: props.getProperty("LATEST_SMOKE") || "0",
+      status: props.getProperty("LATEST_STATUS") || "0",
+      date: props.getProperty("LATEST_DATE") || "--",
+      time: props.getProperty("LATEST_TIME") || "--",
+      timestamp: props.getProperty("LAST_UPDATE") || "0"
+    };
+    
+    return createJsonResponse(response);
+    
+  } catch (error) {
+    console.error("Error in handleLatestRequest:", error);
+    return createJsonResponse({
+      smoke: "0",
+      status: "0",
+      date: "--",
+      time: "--",
+      timestamp: "0"
+    });
+  }
+}
+
+/* ================= HANDLE HISTORY REQUEST ================= */
+function handleHistoryRequest() {
+  try {
+    console.log("📊 Handling history request");
+    
+    // Get the Logs sheet
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName("Logs");
+    
+    if (!sheet) {
+      console.log("No Logs sheet found");
+      return createJsonResponse([]);
+    }
+    
+    // Get all data
+    const data = sheet.getDataRange().getValues();
+    
+    if (data.length <= 1) {
+      return createJsonResponse([]);
+    }
+    
+    // Remove header row
+    data.shift();
+    
+    // Get last 50 rows (most recent) and reverse for chronological order
+    const recentData = data.slice(-50).reverse();
+    
+    // Format data
+    const formattedData = recentData.map((row, index) => {
+      return [
+        (row[0] || "").toString(),        // ID
+        (row[1] || "0").toString(),       // Smoke Value
+        (row[2] || "0").toString(),       // Status
+        formatDateForDisplay(row[3]),     // Date
+        formatTimeForDisplay(row[4]),     // Time
+        (row[5] || "Unknown").toString()  // WiFi
+      ];
+    });
+    
+    console.log(`Returning ${formattedData.length} history records`);
+    return createJsonResponse(formattedData);
+    
+  } catch (error) {
+    console.error("Error in handleHistoryRequest:", error);
+    return createJsonResponse([]);
+  }
+}
+
+/* ================= HANDLE GET COMMAND ================= */
+function handleGetCommand() {
+  try {
+    console.log("🔄 Handling getCommand request");
+    
+    const props = PropertiesService.getScriptProperties();
+    let buzzerState = props.getProperty("BUZZER_CMD") || "1";
+    
+    // Auto-reset: If no updates for 5 minutes, reset buzzer to enabled
+    const lastUpdate = parseInt(props.getProperty("LAST_UPDATE") || "0");
+    const currentTime = new Date().getTime();
+    const fiveMinutes = 5 * 60 * 1000;
+    
+    if (currentTime - lastUpdate > fiveMinutes) {
+      console.log("Auto-resetting buzzer (no updates for 5 minutes)");
+      buzzerState = "1";
+      props.setProperty("BUZZER_CMD", "1");
+    }
+    
+    const response = { buzzer: buzzerState };
+    return createJsonResponse(response);
+    
+  } catch (error) {
+    console.error("Error in handleGetCommand:", error);
+    return createJsonResponse({ buzzer: "1" });
+  }
+}
+
+/* ================= HANDLE COMMAND ================= */
+function handleCommand(buzzerState, source) {
+  try {
+    console.log(`🎛️ Setting buzzer to: ${buzzerState} by ${source}`);
+    
+    const props = PropertiesService.getScriptProperties();
+    props.setProperty("BUZZER_CMD", buzzerState);
+    
+    // Log the command
+    logCommand(buzzerState, source);
+    
+    return createTextResponse("SUCCESS");
+    
+  } catch (error) {
+    console.error("Error in handleCommand:", error);
+    return createTextResponse("ERROR");
+  }
+}
+
+/* ================= HANDLE HEALTH CHECK ================= */
+function handleHealthCheck() {
+  try {
+    console.log("🏥 Health check request");
+    
+    const props = PropertiesService.getScriptProperties();
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName("Logs");
+    
+    const response = {
+      status: "online",
+      timestamp: new Date().getTime(),
+      last_smoke_value: props.getProperty("LATEST_SMOKE") || "0",
+      last_update: props.getProperty("LAST_UPDATE") || "0",
+      buzzer_state: props.getProperty("BUZZER_CMD") || "1",
+      total_logs: sheet ? sheet.getLastRow() - 1 : 0,
+      version: "2.0",
+      system: "GMU Smoke Detection"
+    };
+    
+    return createJsonResponse(response);
+    
+  } catch (error) {
+    console.error("Error in handleHealthCheck:", error);
+    return createJsonResponse({ status: "error", error: error.message });
+  }
+}
+
+/* ================= HANDLE TEST REQUEST ================= */
+function handleTestRequest() {
+  try {
+    return createJsonResponse({
+      message: "GMU Smoke System is working!",
+      timestamp: new Date().getTime(),
+      status: "success"
+    });
+  } catch (error) {
+    return createJsonResponse({ error: error.message });
+  }
+}
+
+/* ================= SMOKE ALERT HANDLING ================= */
+function handleSmokeAlert(smoke, status, props) {
+  try {
+    const smokeActive = props.getProperty("SMOKE_ACTIVE") === "true";
+    const lastEmailSent = parseInt(props.getProperty("LAST_EMAIL_SENT") || "0");
+    const currentTime = new Date().getTime();
+    const emailCooldown = 5 * 60 * 1000; // 5 minutes
+    
+    // Smoke just detected
+    if (status === 1 && !smokeActive) {
+      console.log("🚨 Smoke detected for the first time");
+      props.setProperty("SMOKE_ACTIVE", "true");
+      
+      // Send email if cooldown has passed
+      if (currentTime - lastEmailSent > emailCooldown) {
+        sendAlertEmail(smoke);
+        props.setProperty("LAST_EMAIL_SENT", currentTime.toString());
+      }
+    }
+    
+    // Smoke cleared
+    if (status === 0 && smokeActive) {
+      console.log("✅ Smoke cleared");
+      props.setProperty("SMOKE_ACTIVE", "false");
+    }
+    
+  } catch (error) {
+    console.error("Error in handleSmokeAlert:", error);
+  }
+}
+
+/* ================= LOG TO SPREADSHEET ================= */
+function logToSheet(smoke, status, date, time, wifi) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let sheet = ss.getSheetByName("Logs");
+    
+    // Create sheet if it doesn't exist
+    if (!sheet) {
+      console.log("Creating Logs sheet...");
+      sheet = ss.insertSheet("Logs");
+      
+      // Add headers
+      sheet.getRange("A1:F1").setValues([[
+        "ID", "Smoke Value", "Status", "Date", "Time", "WiFi Network"
+      ]]);
+      
+      // Format headers
+      sheet.getRange("A1:F1").setFontWeight("bold");
+      sheet.setFrozenRows(1);
+    }
+    
+    // Get next ID
+    const lastRow = sheet.getLastRow();
+    const nextId = lastRow > 0 ? lastRow : 1;
+    
+    // Append new row
+    sheet.appendRow([nextId, smoke, status, date, time, wifi]);
+    
+    // Keep only last 1000 rows
+    if (lastRow > 1000) {
+      const rowsToDelete = lastRow - 1000;
+      if (rowsToDelete > 1) {
+        sheet.deleteRows(2, rowsToDelete);
+      }
+    }
+    
+  } catch (error) {
+    console.error("Error in logToSheet:", error);
+  }
+}
+
+function logCommand(buzzerState, source) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let sheet = ss.getSheetByName("CommandLogs");
+    
+    if (!sheet) {
+      sheet = ss.insertSheet("CommandLogs");
+      sheet.getRange("A1:C1").setValues([["Timestamp", "Action", "Source"]]);
+      sheet.getRange("A1:C1").setFontWeight("bold");
+    }
+    
+    const now = new Date();
+    const action = buzzerState === "0" ? "MUTE" : "ENABLE";
+    
+    sheet.appendRow([
+      Utilities.formatDate(now, "Asia/Kolkata", "dd-MM-yyyy HH:mm:ss"),
+      action,
+      source
+    ]);
+    
+  } catch (error) {
+    console.error("Error in logCommand:", error);
+  }
+}
+
+/* ================= SEND ALERT EMAIL ================= */
+function sendAlertEmail(smoke) {
+  try {
+    console.log("Sending alert email...");
+    
+    const recipient = "syncbyadi@gmail.com";
+    const subject = `🚨 Smoke Alert: ${smoke} | GMU HOD Cabin`;
+    
+    const htmlBody = `
+<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+  <div style="background: #d32f2f; padding: 20px; text-align: center; color: white;">
+    <h2 style="margin: 0;">🚨 SMOKE ALERT</h2>
+    <p>GM University - IoT Safety System</p>
+  </div>
+  
+  <div style="padding: 20px;">
+    <p><strong>Smoke has been detected in the HOD Cabin!</strong></p>
+    
+    <div style="background: #fff3cd; padding: 15px; border-radius: 5px; margin: 15px 0;">
+      <h3 style="margin: 0; color: #856404;">Smoke Level: ${smoke}</h3>
+    </div>
+    
+    <p>Please check the dashboard immediately:</p>
+    <p><a href="https://gmu-smoke-app.vercel.app/" style="background: #007bff; color: white; padding: 10px 15px; text-decoration: none; border-radius: 5px;">Open Dashboard</a></p>
+    
+    <hr style="margin: 20px 0;">
+    
+    <p style="color: #666; font-size: 12px;">
+      This is an automated alert from the IoT Smoke Detection System.<br>
+      GM University • Department of Computer Science
+    </p>
+  </div>
+</div>`;
+
+    GmailApp.sendEmail(recipient, subject, "", {
+      htmlBody: htmlBody,
+      name: "GMU Smoke Detection System"
+    });
+    
+    console.log("✅ Email sent");
+    
+  } catch (error) {
+    console.error("❌ Failed to send email:", error);
+  }
+}
+
+/* ================= HELPER FUNCTIONS ================= */
+function formatDateForDisplay(dateValue) {
+  if (!dateValue) return "--";
+  
+  try {
+    if (dateValue instanceof Date) {
+      return Utilities.formatDate(dateValue, "Asia/Kolkata", "dd-MM-yyyy");
+    }
+    
+    const str = String(dateValue);
+    if (str.includes("T")) {
+      const [year, month, day] = str.split("T")[0].split("-");
+      return `${day}-${month}-${year}`;
+    }
+    
+    return str;
+  } catch (e) {
+    return "--";
+  }
+}
+
+function formatTimeForDisplay(timeValue) {
+  if (!timeValue) return "--";
+  
+  try {
+    if (timeValue instanceof Date) {
+      return Utilities.formatDate(timeValue, "Asia/Kolkata", "HH:mm:ss");
+    }
+    
+    const str = String(timeValue);
+    return str.replace("Z", "").replace(".000", "").split("T")[1] || str;
+  } catch (e) {
+    return "--";
+  }
+}
+
+function createJsonResponse(data) {
+  return ContentService
+    .createTextOutput(JSON.stringify(data))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function createTextResponse(text) {
+  return ContentService
+    .createTextOutput(text)
+    .setMimeType(ContentService.MimeType.TEXT);
+}
+
+function createErrorResponse(error) {
+  return ContentService
+    .createTextOutput(JSON.stringify({ error: error }))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+/* ================= INITIALIZATION ================= */
+function initializeSystem() {
+  console.log("🚀 Initializing GMU Smoke System...");
+  
+  try {
+    const props = PropertiesService.getScriptProperties();
+    
+    // Set default properties
+    props.setProperties({
+      "LATEST_SMOKE": "0",
+      "LATEST_STATUS": "0",
+      "LATEST_DATE": Utilities.formatDate(new Date(), "Asia/Kolkata", "dd-MM-yyyy"),
+      "LATEST_TIME": Utilities.formatDate(new Date(), "Asia/Kolkata", "HH:mm:ss"),
+      "LAST_UPDATE": new Date().getTime().toString(),
+      "BUZZER_CMD": "1",
+      "SMOKE_ACTIVE": "false",
+      "LAST_EMAIL_SENT": "0"
+    });
+    
+    // Create sheets if they don't exist
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    
+    if (!ss.getSheetByName("Logs")) {
+      const logsSheet = ss.insertSheet("Logs");
+      logsSheet.getRange("A1:F1").setValues([["ID", "Smoke Value", "Status", "Date", "Time", "WiFi Network"]]);
+      logsSheet.getRange("A1:F1").setFontWeight("bold");
+      logsSheet.setFrozenRows(1);
+    }
+    
+    if (!ss.getSheetByName("CommandLogs")) {
+      const cmdSheet = ss.insertSheet("CommandLogs");
+      cmdSheet.getRange("A1:C1").setValues([["Timestamp", "Action", "Source"]]);
+      cmdSheet.getRange("A1:C1").setFontWeight("bold");
+    }
+    
+    console.log("✅ System initialized successfully!");
+    
+  } catch (error) {
+    console.error("❌ Error initializing system:", error);
+  }
+}
+
+// Run this once to initialize
+// initializeSystem();

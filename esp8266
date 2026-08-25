@@ -1,0 +1,273 @@
+#include <ESP8266WiFi.h>
+#include <ESP8266HTTPClient.h>
+#include <WiFiClientSecure.h>
+
+/* ================= GOOGLE SCRIPT ================= */
+const char* SCRIPT_URL =
+"https://script.google.com/macros/s/AKfycbyNhSSPt0SDoz-aktQ4d3rslfXkviQEp7dRN9GCbJVI8Oyi1czpURe8u2lGwmxLYQZvxw/exec";
+
+/* ================= HARDWARE ================= */
+#define MQ2_PIN A0
+#define BUZZER_PIN D6
+
+int BASE_THRESHOLD = 150;      // default smoke threshold
+int dynamicThreshold = 150;   
+
+/* ================= STATE ================= */
+bool smokeActive = false;
+bool buzzerMuted = false;
+unsigned long lastCommandCheck = 0;
+const unsigned long COMMAND_CHECK_INTERVAL = 1000; // Check commands every 1 second
+
+/* ================= WIFI LIST ================= */
+struct WiFiCred {
+  const char* ssid;
+  const char* pass;
+};
+
+WiFiCred wifiList[] = {
+  {"GMU", "$ecure@dmin"},
+  {"GMU_Staff", "GMU@2025@"},
+  {"GMIT", "GMIT@2017"},
+  {"Adityab", "Aditya123"}
+};
+
+const int WIFI_COUNT = sizeof(wifiList) / sizeof(wifiList[0]);
+
+/* ================= CONNECT BEST WIFI ================= */
+void connectBestWiFi() {
+  Serial.println("\n--------------------------------");
+  Serial.println("📡 Scanning for WiFi Networks...");
+  
+  int n = WiFi.scanNetworks();
+  int bestRSSI = -999;
+  int bestIndex = -1;
+
+  if (n == 0) {
+    Serial.println("❌ No networks found.");
+  } else {
+    Serial.print("🔍 Found "); Serial.print(n); Serial.println(" networks:");
+    
+    for (int i = 0; i < n; i++) {
+      String scannedSSID = WiFi.SSID(i);
+      int scannedRSSI = WiFi.RSSI(i);
+      
+      Serial.print("   [" + String(i) + "] " + scannedSSID + " (" + String(scannedRSSI) + " dBm) -> ");
+      
+      bool known = false;
+      for (int j = 0; j < WIFI_COUNT; j++) {
+        if (scannedSSID == wifiList[j].ssid) {
+          known = true;
+          Serial.println("Match found! ✅");
+          if (scannedRSSI > bestRSSI) {
+            bestRSSI = scannedRSSI;
+            bestIndex = j;
+          }
+        }
+      }
+      if (!known) Serial.println("Unknown ❌");
+    }
+  }
+
+  if (bestIndex == -1) {
+    Serial.println("\n❌ No matching WiFi networks found from your list.");
+    return;
+  }
+
+  Serial.println("\n✨ DECISION: The Best WiFi is \"" + String(wifiList[bestIndex].ssid) + "\"");
+  Serial.print("⏳ Connecting...");
+
+  WiFi.begin(wifiList[bestIndex].ssid, wifiList[bestIndex].pass);
+  
+  int timeout = 0;
+  while (WiFi.status() != WL_CONNECTED && timeout < 20) {
+    delay(500);
+    Serial.print(".");
+    timeout++;
+  }
+
+  if(WiFi.status() == WL_CONNECTED){
+    Serial.println("\n✅ WiFi Connected Successfully!");
+    Serial.print("   IP Address: ");
+    Serial.println(WiFi.localIP());
+  } else {
+    Serial.println("\n❌ Connection Failed.");
+  }
+  Serial.println("--------------------------------\n");
+}
+
+/* ================= SEND LOG ================= */
+bool sendLog(int smoke, int status) {
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("❌ Cannot send data: WiFi Disconnected");
+    return false;
+  }
+
+  Serial.print("📤 Sending Data to Google Sheets... ");
+
+  WiFiClientSecure client;
+  client.setInsecure();
+  HTTPClient http;
+
+  String url = String(SCRIPT_URL) +
+               "?smoke_value=" + String(smoke) +
+               "&status=" + String(status) +
+               "&wifi=" + WiFi.SSID();
+
+  http.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
+  http.begin(client, url);
+  
+  int httpCode = http.GET();
+  
+  if (httpCode == 200 || httpCode == 302) {
+    Serial.println("✅ SUCCESS");
+    http.end();
+    return true;
+  } else {
+    Serial.print("❌ FAILED (Error: ");
+    Serial.print(httpCode > 0 ? String(httpCode) : http.errorToString(httpCode));
+    Serial.println(")");
+    http.end();
+    return false;
+  }
+}
+
+/* ================= FETCH BUZZER COMMAND ================= */
+void fetchBuzzerCommand() {
+  if (WiFi.status() != WL_CONNECTED) return;
+
+  unsigned long currentMillis = millis();
+  if (currentMillis - lastCommandCheck >= COMMAND_CHECK_INTERVAL) {
+    lastCommandCheck = currentMillis;
+    
+    WiFiClientSecure client;
+    client.setInsecure();
+    HTTPClient http;
+
+    http.begin(client, String(SCRIPT_URL) + "?action=getCommand");
+    http.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
+
+    int code = http.GET();
+
+    if (code == 200) {
+      String res = http.getString();
+      
+      // Check for "0" (Muted)
+      if (res.indexOf(":\"0\"") > -1 || res.indexOf(": \"0\"") > -1) {
+        if (!buzzerMuted) {
+          buzzerMuted = true;
+          digitalWrite(BUZZER_PIN, LOW);
+          Serial.println("\n🔕 COMMAND RECEIVED: Buzzer Muted by User");
+        }
+      }
+
+      // Check for "1" (Active)
+      if (res.indexOf(":\"1\"") > -1 || res.indexOf(": \"1\"") > -1) {
+        if (buzzerMuted) { 
+          buzzerMuted = false;
+          dynamicThreshold = BASE_THRESHOLD;
+          Serial.println("\n🔔 COMMAND RECEIVED: Buzzer Enabled");
+        }
+      }
+    } 
+    http.end();
+  }
+}
+
+/* ================= MAIN SMOKE LOGIC ================= */
+void checkSmoke() {
+  int value = analogRead(MQ2_PIN);
+
+  // Print smoke value one by one
+  Serial.print("Reading: ");
+  Serial.print(value);
+  Serial.print(" | Threshold: ");
+  Serial.print(dynamicThreshold);
+  
+  if(buzzerMuted) Serial.print(" [MUTED]");
+  Serial.println();
+
+  // ===== SMOKE DETECTED =====
+  if (value > dynamicThreshold && !smokeActive) {
+    Serial.println("\n=================================");
+    Serial.println("🔥 🔥 SMOKE DETECTED! Value: " + String(value));
+    
+    smokeActive = true;
+
+    // Send Log and check result
+    bool sent = sendLog(value, 1);
+    
+    if (sent) {
+       Serial.println("   Data successfully logged to Sheet.");
+    } else {
+       Serial.println("   ⚠️ Warning: Data failed to send.");
+    }
+
+    // 🔊 Buzzer Logic
+    if (!buzzerMuted) {
+      digitalWrite(BUZZER_PIN, HIGH);
+      Serial.println("   🔊 Buzzer: ON");
+    } else {
+      Serial.println("   🔕 Buzzer: SKIPPED (Muted)");
+    }
+    Serial.println("=================================\n");
+  }
+
+  // ===== SMOKE CLEARED =====
+  if (value <= BASE_THRESHOLD && smokeActive) {
+    Serial.println("\n=================================");
+    Serial.println("✅ SMOKE CLEARED. Value: " + String(value));
+    
+    smokeActive = false;
+
+    // Send Log
+    sendLog(value, 0);
+
+    digitalWrite(BUZZER_PIN, LOW);
+    Serial.println("   🔊 Buzzer: OFF");
+
+    // *** THE RESET LOGIC FOR NEW EVENT ***
+    // Ensure buzzer is unmuted for the NEXT fire event automatically
+    if(buzzerMuted) {
+      buzzerMuted = false;
+      Serial.println("   🔄 System Reset: Buzzer automatically un-muted for next event.");
+    }
+    
+    Serial.println("=================================\n");
+  }
+
+  // 🔕 Force buzzer OFF if currently muted
+  if (buzzerMuted) {
+    digitalWrite(BUZZER_PIN, LOW);
+  }
+}
+
+/* ================= SETUP ================= */
+void setup() {
+  Serial.begin(115200);
+  delay(1000);
+  
+  pinMode(BUZZER_PIN, OUTPUT);
+  digitalWrite(BUZZER_PIN, LOW);
+
+  WiFi.mode(WIFI_STA);
+  
+  // Connect WiFi at startup
+  connectBestWiFi();
+}
+
+/* ================= LOOP ================= */
+void loop() {
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("⚠️ WiFi Lost. Reconnecting...");
+    connectBestWiFi();
+  }
+
+  // 1. Check if user pressed Mute on App/Sheet (FAST - every loop)
+  fetchBuzzerCommand();
+  
+  // 2. Monitor Smoke Sensor
+  checkSmoke();
+
+  delay(1000); // Changed to 1 second delay between readings (was 2000)
+}

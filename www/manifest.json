@@ -1,0 +1,22 @@
+ {
+  "name": "GMU Smoke Monitoring System",
+  "short_name": "GMU Smoke",
+  "description": "IoT-based Smoke Detection & Alert System",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#6b1f1f",
+  "theme_color": "#6b1f1f",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "logo.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "logo.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
