@@ -1,4 +1,4 @@
-const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzkJTV86qUilUuy6Ci_N7vlExsVtDMxFcl9C80Bhw5i9vcYmApgcufFINCQK8aCBdjAIQ/exec";
+const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwcDvYLMdEum331RvPBzrt86EH2GhysscbRYezT5lsestYXJHDIt8sZKH79QqGLDLs8JA/exec";
 const UPDATE_INTERVAL = 3000;
 
 let notificationPermission = false;
